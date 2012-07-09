@@ -10,9 +10,11 @@ import (
 	"strings"
 )
 
-type ProcessRequest func(br *bufio.Reader, bw *bufio.Writer) bool
+type Pump interface {
+	Run(br *bufio.Reader, bw *bufio.Writer) bool
+}
 
-func AcceptConns(ls net.Listener, maxConns int, processRequest ProcessRequest) {
+func AcceptConns(ls net.Listener, maxConns int, pump Pump) {
 	log.Printf("accepting max conns: %d", maxConns)
 
 	chanAccepted := make(chan io.ReadWriteCloser)
@@ -38,7 +40,7 @@ func AcceptConns(ls net.Listener, maxConns int, processRequest ProcessRequest) {
 			select {
 			case c := <-chanAccepted:
 				log.Printf("conn accepted")
-				go ProcessRequests(c, chanClosed, processRequest)
+				go RunPump(c, chanClosed, pump)
 				numConns++
 			case <-chanClosed:
 				log.Printf("conn closed")
@@ -53,9 +55,7 @@ func AcceptConns(ls net.Listener, maxConns int, processRequest ProcessRequest) {
 	}
 }
 
-func ProcessRequests(s io.ReadWriteCloser,
-	chanClosed chan io.ReadWriteCloser,
-	processRequest ProcessRequest) {
+func RunPump(s io.ReadWriteCloser, chanClosed chan io.ReadWriteCloser, pump Pump) {
 	defer func() {
 		chanClosed <- s
 		s.Close()
@@ -64,7 +64,7 @@ func ProcessRequests(s io.ReadWriteCloser,
 	br := bufio.NewReader(s)
 	bw := bufio.NewWriter(s)
 
-	for processRequest(br, bw) {
+	for pump.Run(br, bw) {
 	}
 }
 
@@ -91,7 +91,11 @@ var asciiCmds = map[string]AsciiCmd{
 	},
 }
 
-func ProcessAsciiRequest(br *bufio.Reader, bw *bufio.Writer) bool {
+type AsciiPump struct {
+	tot uint64
+}
+
+func (self AsciiPump) Run(br *bufio.Reader, bw *bufio.Writer) bool {
 	buf, isPrefix, e := br.ReadLine()
 	if e != nil {
 		log.Printf("ProcessRequest error: %s", e)
@@ -127,10 +131,8 @@ func MainServer(port int, maxConns int) {
 		return
 	}
 	defer ls.Close()
-
 	log.Printf("listening on port: %d", port)
-
-	AcceptConns(ls, maxConns, ProcessAsciiRequest)
+	AcceptConns(ls, maxConns, &AsciiPump{})
 }
 
 func main() {
