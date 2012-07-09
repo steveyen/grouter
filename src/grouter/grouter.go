@@ -10,11 +10,15 @@ import (
 	"strings"
 )
 
-type Pump interface {
-	Run(br *bufio.Reader, bw *bufio.Writer) bool
+type Source interface {
+	Run(br *bufio.Reader, bw *bufio.Writer, target *Target) bool
 }
 
-func AcceptConns(ls net.Listener, maxConns int, pump Pump) {
+type Target interface {
+	Handle() bool
+}
+
+func AcceptConns(ls net.Listener, maxConns int, source Source, target Target) {
 	log.Printf("accepting max conns: %d", maxConns)
 
 	chanAccepted := make(chan io.ReadWriteCloser)
@@ -55,7 +59,7 @@ func AcceptConns(ls net.Listener, maxConns int, pump Pump) {
 					br := bufio.NewReader(s)
 					bw := bufio.NewWriter(s)
 
-					for pump.Run(br, bw) {
+					for source.Run(br, bw, &target) {
 					}
 				}(c)
 			case <-chanClosed:
@@ -81,31 +85,32 @@ var (
 	resultServerErrorPrefix = []byte("SERVER_ERROR ")
 )
 
-type AsciiCmd func(AsciiPump, []string, *bufio.Reader, *bufio.Writer) bool
+type AsciiCmd func(*AsciiSource, *Target, []string, *bufio.Reader, *bufio.Writer) bool
 
 var asciiCmds = map[string]AsciiCmd{
-	"quit": func(pump AsciiPump, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
+	"quit": func(source *AsciiSource, target *Target,
+		req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 		return false
 	},
-	"version": func(pump AsciiPump, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
+	"version": func(source *AsciiSource, target *Target,
+		req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 		bw.Write([]byte(version))
 		bw.Flush()
 		return true
 	},
 }
 
-type AsciiPump struct {
-	whatever_state uint64
+type AsciiSource struct {
 }
 
-func (self AsciiPump) Run(br *bufio.Reader, bw *bufio.Writer) bool {
+func (self AsciiSource) Run(br *bufio.Reader, bw *bufio.Writer, target *Target) bool {
 	buf, isPrefix, e := br.ReadLine()
 	if e != nil {
-		log.Printf("ProcessRequest error: %s", e)
+		log.Printf("AsciiSource error: %s", e)
 		return false
 	}
 	if isPrefix {
-		log.Printf("ProcessRequest request is too long")
+		log.Printf("AsciiSource request is too long")
 		return false
 	}
 
@@ -122,7 +127,16 @@ func (self AsciiPump) Run(br *bufio.Reader, bw *bufio.Writer) bool {
 		return true
 	}
 
-	return asciiCmd(self, req, br, bw)
+	return asciiCmd(&self, target, req, br, bw)
+}
+
+// ---------------------------------------------------------
+
+type MemoryTarget struct {
+}
+
+func (self MemoryTarget) Handle() bool {
+	return true
 }
 
 // ---------------------------------------------------------
@@ -135,7 +149,7 @@ func MainServer(port int, maxConns int) {
 	}
 	defer ls.Close()
 	log.Printf("listening on port: %d", port)
-	AcceptConns(ls, maxConns, &AsciiPump{})
+	AcceptConns(ls, maxConns, &AsciiSource{}, &MemoryTarget{})
 }
 
 func main() {
