@@ -63,13 +63,13 @@ func AcceptConns(ls net.Listener, maxConns int, processRequests ProcessRequests)
 
 // ---------------------------------------------------------
 
-type AsciiCmd func([]byte, *bufio.Reader, *bufio.Writer) bool
+type AsciiCmd func([]string, *bufio.Reader, *bufio.Writer) bool
 
 var asciiCmds = map[string]AsciiCmd{
-	"quit": func(line []byte, br *bufio.Reader, bw *bufio.Writer) bool {
+	"quit": func(parts []string, br *bufio.Reader, bw *bufio.Writer) bool {
 		return false
 	},
-	"version": func(line []byte, br *bufio.Reader, bw *bufio.Writer) bool {
+	"version": func(parts []string, br *bufio.Reader, bw *bufio.Writer) bool {
 		bw.Write([]byte(version))
 		bw.Flush()
 		return true
@@ -113,7 +113,7 @@ func ProcessRequestAscii(br *bufio.Reader, bw *bufio.Writer) bool {
 		return true
 	}
 
-	return asciiCmd(buf, br, bw)
+	return asciiCmd(parts, br, bw)
 }
 
 // ---------------------------------------------------------
