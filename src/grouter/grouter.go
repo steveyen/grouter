@@ -76,7 +76,7 @@ var asciiCmds = map[string]AsciiCmd{
 	},
 }
 
-func ProcessRequestsAscii(s io.ReadWriteCloser, chanClosed chan io.ReadWriteCloser) {
+func ProcessAsciiRequests(s io.ReadWriteCloser, chanClosed chan io.ReadWriteCloser) {
 	defer func() {
 		chanClosed <- s
 		s.Close()
@@ -85,11 +85,11 @@ func ProcessRequestsAscii(s io.ReadWriteCloser, chanClosed chan io.ReadWriteClos
 	br := bufio.NewReader(s)
 	bw := bufio.NewWriter(s)
 
-	for ProcessRequestAscii(br, bw) {
+	for ProcessAsciiRequest(br, bw) {
 	}
 }
 
-func ProcessRequestAscii(br *bufio.Reader, bw *bufio.Writer) bool {
+func ProcessAsciiRequest(br *bufio.Reader, bw *bufio.Writer) bool {
 	buf, isPrefix, e := br.ReadLine()
 	if e != nil {
 		log.Printf("ProcessRequest error: %s", e)
@@ -128,7 +128,7 @@ func MainServer(port int, maxConns int) {
 
 	log.Printf("listening on port: %d", port)
 
-	AcceptConns(ls, maxConns, ProcessRequestsAscii)
+	AcceptConns(ls, maxConns, ProcessAsciiRequests)
 }
 
 func main() {
