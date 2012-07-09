@@ -11,12 +11,12 @@ Building
     git clone git://github.com/steveyen/grouter.git
     cd grouter
     export GOPATH=`pwd`
-    go install ./src/grouter
+    go build .
 
 Running
 -------
 
-    ./bin/grouter --help
+    ./grouter --help
 
 License
 -------
