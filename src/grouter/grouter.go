@@ -29,7 +29,6 @@ func AcceptConns(ls net.Listener, maxConns int, pump Pump) {
 				close(chanAccepted)
 				return
 			}
-
 			chanAccepted <- c
 		}
 	}()
@@ -39,9 +38,26 @@ func AcceptConns(ls net.Listener, maxConns int, pump Pump) {
 			log.Printf("accepted conns: %d", numConns)
 			select {
 			case c := <-chanAccepted:
+				if c == nil {
+					log.Printf("error: can't accept more conns")
+					return
+				}
+
 				log.Printf("conn accepted")
-				go RunPump(c, chanClosed, pump)
 				numConns++
+
+				go func(s io.ReadWriteCloser) {
+					defer func() {
+						chanClosed <- s
+						s.Close()
+					}()
+
+					br := bufio.NewReader(s)
+					bw := bufio.NewWriter(s)
+
+					for pump.Run(br, bw) {
+					}
+				}(c)
 			case <-chanClosed:
 				log.Printf("conn closed")
 				numConns--
@@ -52,19 +68,6 @@ func AcceptConns(ls net.Listener, maxConns int, pump Pump) {
 			log.Printf("conn closed")
 			numConns--
 		}
-	}
-}
-
-func RunPump(s io.ReadWriteCloser, chanClosed chan io.ReadWriteCloser, pump Pump) {
-	defer func() {
-		chanClosed <- s
-		s.Close()
-	}()
-
-	br := bufio.NewReader(s)
-	bw := bufio.NewWriter(s)
-
-	for pump.Run(br, bw) {
 	}
 }
 
@@ -92,7 +95,7 @@ var asciiCmds = map[string]AsciiCmd{
 }
 
 type AsciiPump struct {
-	tot uint64
+	whatever_state uint64
 }
 
 func (self AsciiPump) Run(br *bufio.Reader, bw *bufio.Writer) bool {
