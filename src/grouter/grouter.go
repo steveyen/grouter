@@ -11,14 +11,8 @@ import (
 )
 
 var (
-	crlf            = []byte("\r\n")
-	version         = []byte("VERSION grouter 0.0.0\r\n")
-	resultStored    = []byte("STORED\r\n")
-	resultNotStored = []byte("NOT_STORED\r\n")
-	resultExists    = []byte("EXISTS\r\n")
-	resultNotFound  = []byte("NOT_FOUND\r\n")
-	resultDeleted   = []byte("DELETED\r\n")
-	resultEnd       = []byte("END\r\n")
+	crlf    = []byte("\r\n")
+	version = []byte("VERSION grouter 0.0.0\r\n")
 
 	resultClientErrorPrefix = []byte("CLIENT_ERROR ")
 	resultServerErrorPrefix = []byte("SERVER_ERROR ")
