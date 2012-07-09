@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -85,6 +87,13 @@ var (
 	resultServerErrorPrefix = []byte("SERVER_ERROR ")
 )
 
+func client_error(bw *bufio.Writer, msg string) bool {
+	bw.Write(resultClientErrorPrefix)
+	bw.Write([]byte(msg))
+	bw.Flush()
+	return true
+}
+
 type AsciiCmd func(*AsciiSource, *Target, []string, *bufio.Reader, *bufio.Writer) bool
 
 var asciiCmds = map[string]AsciiCmd{
@@ -95,6 +104,71 @@ var asciiCmds = map[string]AsciiCmd{
 	"version": func(source *AsciiSource, target *Target,
 		req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 		bw.Write([]byte(version))
+		bw.Flush()
+		return true
+	},
+	"set": func(source *AsciiSource, target *Target,
+		req []string, br *bufio.Reader, bw *bufio.Writer) bool {
+		if len(req) != 5 {
+			return client_error(bw, "expected 4 params for set command\r\n")
+		}
+
+		key := req[1]
+		if len(key) <= 0 {
+			return client_error(bw, "missing key\r\n")
+		}
+
+		flg, e := strconv.Atoi(req[2])
+		if e != nil {
+			return client_error(bw, "could not parse flag\r\n")
+		}
+
+		exp, e := strconv.Atoi(req[3])
+		if e != nil {
+			return client_error(bw, "could not parse expiration\r\n")
+		}
+
+		nval, e := strconv.Atoi(req[4])
+		if e != nil || nval < 0 {
+			return client_error(bw, "could not parse value length\r\n")
+		}
+
+		buf := make([]byte, nval + 2)
+
+		nbuf, e := io.ReadFull(br, buf)
+		if e != nil {
+			log.Printf("AsciiSource error: %s", e)
+			return false
+		}
+		if nbuf != nval + 2 {
+			log.Printf("AsciiSource nbuf error: %s", e)
+			return false
+		}
+		if !bytes.Equal(buf[nbuf - 2:], crlf) {
+			return client_error(bw, "was expecting CRLF value termination\r\n")
+		}
+		val := buf[:nval]
+
+		log.Printf("set %s %d %d %d = '%s'", key, flg, exp, nval, val)
+
+		bw.Write([]byte("STORED\r\n"))
+		bw.Flush()
+		return true
+	},
+	"get": func(source *AsciiSource, target *Target,
+		req []string, br *bufio.Reader, bw *bufio.Writer) bool {
+		if len(req) != 2 {
+			return client_error(bw, "expected 1 param for get command\r\n")
+		}
+
+		key := req[1]
+		if len(key) <= 0 {
+			return client_error(bw, "missing key\r\n")
+		}
+
+		log.Printf("get %s", key)
+
+		bw.Write([]byte("END\r\n"))
 		bw.Flush()
 		return true
 	},
@@ -117,17 +191,16 @@ func (self AsciiSource) Run(br *bufio.Reader, bw *bufio.Writer, target *Target) 
 	log.Printf("read: '%s'", buf)
 
 	req := strings.Split(strings.TrimSpace(string(buf)), " ")
-	asciiCmd := asciiCmds[req[0]]
-	if asciiCmd == nil {
-		bw.Write(resultClientErrorPrefix)
-		bw.Write([]byte("unknown command - "))
-		bw.Write([]byte(req[0]))
-		bw.Write(crlf)
-		bw.Flush()
-		return true
+	if asciiCmd, ok := asciiCmds[req[0]]; ok {
+		return asciiCmd(&self, target, req, br, bw)
 	}
 
-	return asciiCmd(&self, target, req, br, bw)
+	bw.Write(resultClientErrorPrefix)
+	bw.Write([]byte("unknown command - "))
+	bw.Write([]byte(req[0]))
+	bw.Write(crlf)
+	bw.Flush()
+	return true
 }
 
 // ---------------------------------------------------------
