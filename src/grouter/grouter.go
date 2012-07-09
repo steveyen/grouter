@@ -81,13 +81,13 @@ var (
 	resultServerErrorPrefix = []byte("SERVER_ERROR ")
 )
 
-type AsciiCmd func([]string, *bufio.Reader, *bufio.Writer) bool
+type AsciiCmd func(AsciiPump, []string, *bufio.Reader, *bufio.Writer) bool
 
 var asciiCmds = map[string]AsciiCmd{
-	"quit": func(parts []string, br *bufio.Reader, bw *bufio.Writer) bool {
+	"quit": func(pump AsciiPump, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 		return false
 	},
-	"version": func(parts []string, br *bufio.Reader, bw *bufio.Writer) bool {
+	"version": func(pump AsciiPump, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 		bw.Write([]byte(version))
 		bw.Flush()
 		return true
@@ -111,18 +111,18 @@ func (self AsciiPump) Run(br *bufio.Reader, bw *bufio.Writer) bool {
 
 	log.Printf("read: '%s'", buf)
 
-	parts := strings.Split(strings.TrimSpace(string(buf)), " ")
-	asciiCmd := asciiCmds[parts[0]]
+	req := strings.Split(strings.TrimSpace(string(buf)), " ")
+	asciiCmd := asciiCmds[req[0]]
 	if asciiCmd == nil {
 		bw.Write(resultClientErrorPrefix)
 		bw.Write([]byte("unknown command - "))
-		bw.Write([]byte(parts[0]))
+		bw.Write([]byte(req[0]))
 		bw.Write(crlf)
 		bw.Flush()
 		return true
 	}
 
-	return asciiCmd(parts, br, bw)
+	return asciiCmd(self, req, br, bw)
 }
 
 // ---------------------------------------------------------
