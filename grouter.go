@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -214,21 +213,23 @@ func (self MemoryTarget) Handle() bool {
 
 // ---------------------------------------------------------
 
-func MainServer(port int, maxConns int) {
-	ls, e := net.Listen("tcp", fmt.Sprintf(":%d", port))
+func MainServer(listen string, maxConns int) {
+	ls, e := net.Listen("tcp", listen)
 	if e != nil {
-		log.Fatalf("error: could not listen on port: %d; error: %s", port, e)
-		return
+		log.Fatalf("error: could not listen on: %s; error: %s", listen, e)
+	} else {
+		defer ls.Close()
+		log.Printf("listening to: %s", listen)
+		AcceptConns(ls, maxConns, &AsciiSource{}, &MemoryTarget{})
 	}
-	defer ls.Close()
-	log.Printf("listening on port: %d", port)
-	AcceptConns(ls, maxConns, &AsciiSource{}, &MemoryTarget{})
 }
 
 func main() {
-	var port *int = flag.Int("port", 11300, "port to listen to")
-	var maxConns *int = flag.Int("max-conns", 3, "max conns allowed from clients")
+	var listen *string = flag.String("listen", ":11300",
+		"local address to listen to")
+	var maxConns *int = flag.Int("max-conns", 3,
+		"max conns allowed from clients")
 	flag.Parse()
-	MainServer(*port, *maxConns)
+	MainServer(*listen, *maxConns)
 }
 
