@@ -10,14 +10,6 @@ import (
 	"strings"
 )
 
-var (
-	crlf    = []byte("\r\n")
-	version = []byte("VERSION grouter 0.0.0\r\n")
-
-	resultClientErrorPrefix = []byte("CLIENT_ERROR ")
-	resultServerErrorPrefix = []byte("SERVER_ERROR ")
-)
-
 type ProcessRequest func(br *bufio.Reader, bw *bufio.Writer) bool
 
 func AcceptConns(ls net.Listener, maxConns int, processRequest ProcessRequest) {
@@ -77,6 +69,14 @@ func ProcessRequests(s io.ReadWriteCloser,
 }
 
 // ---------------------------------------------------------
+
+var (
+	crlf    = []byte("\r\n")
+	version = []byte("VERSION grouter 0.0.0\r\n")
+
+	resultClientErrorPrefix = []byte("CLIENT_ERROR ")
+	resultServerErrorPrefix = []byte("SERVER_ERROR ")
+)
 
 type AsciiCmd func([]string, *bufio.Reader, *bufio.Writer) bool
 
