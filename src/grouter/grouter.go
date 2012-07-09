@@ -18,9 +18,9 @@ var (
 	resultServerErrorPrefix = []byte("SERVER_ERROR ")
 )
 
-type ProcessRequests func(io.ReadWriteCloser, chan io.ReadWriteCloser)
+type ProcessRequest func(br *bufio.Reader, bw *bufio.Writer) bool
 
-func AcceptConns(ls net.Listener, maxConns int, processRequests ProcessRequests) {
+func AcceptConns(ls net.Listener, maxConns int, processRequest ProcessRequest) {
 	log.Printf("accepting max conns: %d", maxConns)
 
 	chanAccepted := make(chan io.ReadWriteCloser)
@@ -46,7 +46,7 @@ func AcceptConns(ls net.Listener, maxConns int, processRequests ProcessRequests)
 			select {
 			case c := <-chanAccepted:
 				log.Printf("conn accepted")
-				go processRequests(c, chanClosed)
+				go ProcessRequests(c, chanClosed, processRequest)
 				numConns++
 			case <-chanClosed:
 				log.Printf("conn closed")
@@ -58,6 +58,21 @@ func AcceptConns(ls net.Listener, maxConns int, processRequests ProcessRequests)
 			log.Printf("conn closed")
 			numConns--
 		}
+	}
+}
+
+func ProcessRequests(s io.ReadWriteCloser,
+	chanClosed chan io.ReadWriteCloser,
+	processRequest ProcessRequest) {
+	defer func() {
+		chanClosed <- s
+		s.Close()
+	}()
+
+	br := bufio.NewReader(s)
+	bw := bufio.NewWriter(s)
+
+	for processRequest(br, bw) {
 	}
 }
 
@@ -74,19 +89,6 @@ var asciiCmds = map[string]AsciiCmd{
 		bw.Flush()
 		return true
 	},
-}
-
-func ProcessAsciiRequests(s io.ReadWriteCloser, chanClosed chan io.ReadWriteCloser) {
-	defer func() {
-		chanClosed <- s
-		s.Close()
-	}()
-
-	br := bufio.NewReader(s)
-	bw := bufio.NewWriter(s)
-
-	for ProcessAsciiRequest(br, bw) {
-	}
 }
 
 func ProcessAsciiRequest(br *bufio.Reader, bw *bufio.Writer) bool {
@@ -128,7 +130,7 @@ func MainServer(port int, maxConns int) {
 
 	log.Printf("listening on port: %d", port)
 
-	AcceptConns(ls, maxConns, ProcessAsciiRequests)
+	AcceptConns(ls, maxConns, ProcessAsciiRequest)
 }
 
 func main() {
