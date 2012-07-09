@@ -1,5 +1,5 @@
-grouter - a proxy/router for memcached, implemented in golang
-=============================================================
+grouter - next-gen memcached/couchbase protocol router
+======================================================
 
 Instead of "hello world", I write proxy/routers when trying out a new
 language.  With grouter, I can also play with design ideas for a moxi
