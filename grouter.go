@@ -18,10 +18,6 @@ type Request struct {
 	Res chan *gomemcached.MCResponse
 }
 
-func (r Request) String() string {
-	return r.Req.String()
-}
-
 type Source interface {
 	Run(io.ReadWriter, chan Request)
 }
