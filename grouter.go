@@ -13,15 +13,20 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
+const (
+	MARKER = gomemcached.CommandCode(0xff)
+)
+
 type Source interface {
-	Run(br *bufio.Reader, bw *bufio.Writer, target *Target) bool
+	Run(chan io.ReadWriteCloser, *Target)
 }
 
-type Target interface {
-	Handle() bool
+type Target struct {
+	chanReq chan *gomemcached.MCRequest
+	chanRes chan *gomemcached.MCResponse
 }
 
-func AcceptConns(ls net.Listener, maxConns int, source Source, target Target) {
+func AcceptConns(ls net.Listener, maxConns int, source Source, target *Target) {
 	log.Printf("accepting max conns: %d", maxConns)
 
 	chanAccepted := make(chan io.ReadWriteCloser)
@@ -54,16 +59,9 @@ func AcceptConns(ls net.Listener, maxConns int, source Source, target Target) {
 				numConns++
 
 				go func(s io.ReadWriteCloser) {
-					defer func() {
-						chanClosed <- s
-						s.Close()
-					}()
-
-					br := bufio.NewReader(s)
-					bw := bufio.NewWriter(s)
-
-					for source.Run(br, bw, &target) {
-					}
+					source.Run(s, target)
+					chanClosed <- s
+					s.Close()
 				}(c)
 			case <-chanClosed:
 				log.Printf("conn closed")
@@ -197,39 +195,47 @@ func AsciiCmdMutation(source *AsciiSource, target *Target, cmd *AsciiCmd,
 type AsciiSource struct {
 }
 
-func (self AsciiSource) Run(br *bufio.Reader, bw *bufio.Writer, target *Target) bool {
-	buf, isPrefix, e := br.ReadLine()
-	if e != nil {
-		log.Printf("AsciiSource error: %s", e)
-		return false
-	}
-	if isPrefix {
-		log.Printf("AsciiSource request is too long")
-		return false
-	}
+func (self AsciiSource) Run(s chan io.ReadWriteCloser, target *Target) {
+	br := bufio.NewReader(s)
+	bw := bufio.NewWriter(s)
 
-	log.Printf("read: '%s'", buf)
+	for {
+		buf, isPrefix, e := br.ReadLine()
+		if e != nil {
+			log.Printf("AsciiSource error: %s", e)
+			return
+		}
+		if isPrefix {
+			log.Printf("AsciiSource request is too long")
+			return
+		}
 
-	req := strings.Split(strings.TrimSpace(string(buf)), " ")
-	if asciiCmd, ok := asciiCmds[req[0]]; ok {
-		return asciiCmd.handler(&self, target, asciiCmd, req, br, bw)
+		log.Printf("read: '%s'", buf)
+
+		req := strings.Split(strings.TrimSpace(string(buf)), " ")
+		if asciiCmd, ok := asciiCmds[req[0]]; ok {
+			if !asciiCmd.handler(&self, target, asciiCmd, req, br, bw) {
+				return
+			}
+		}
+
+		bw.Write(resultClientErrorPrefix)
+		bw.Write([]byte("unknown command - "))
+		bw.Write([]byte(req[0]))
+		bw.Write(crlf)
+		bw.Flush()
 	}
-
-	bw.Write(resultClientErrorPrefix)
-	bw.Write([]byte("unknown command - "))
-	bw.Write([]byte(req[0]))
-	bw.Write(crlf)
-	bw.Flush()
-	return true
 }
 
 // ---------------------------------------------------------
 
-type MemoryTarget struct {
-}
-
-func (self MemoryTarget) Handle() bool {
-	return true
+func MemoryTargetRun(target *Target) {
+	for {
+		req := <- target.chanReq
+		log.Printf("mtr req: %s", req)
+		res := &gomemcached.MCResponse{}
+		target.chanRes <- res
+	}
 }
 
 // ---------------------------------------------------------
@@ -241,7 +247,15 @@ func MainServer(listen string, maxConns int) {
 	} else {
 		defer ls.Close()
 		log.Printf("listening to: %s", listen)
-		AcceptConns(ls, maxConns, &AsciiSource{}, &MemoryTarget{})
+
+		chanSize := 5
+		target := &Target{
+			make(chan *gomemcached.MCRequest, chanSize),
+			make(chan *gomemcached.MCResponse, chanSize)}
+		go func() {
+			MemoryTargetRun(target)
+		}()
+		AcceptConns(ls, maxConns, &AsciiSource{}, target)
 	}
 }
 
