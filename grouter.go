@@ -13,13 +13,13 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-const (
-	MARKER = gomemcached.CommandCode(0xff)
-)
-
 type Request struct {
-	req *gomemcached.MCRequest
-	res chan *gomemcached.MCResponse
+	Req *gomemcached.MCRequest
+	Res chan *gomemcached.MCResponse
+}
+
+func (r Request) String() string {
+	return r.Req.String()
 }
 
 type Source interface {
@@ -109,7 +109,7 @@ func (self AsciiSource) Run(s io.ReadWriter, target chan Request) {
 
 		req := strings.Split(strings.TrimSpace(string(buf)), " ")
 		if asciiCmd, ok := asciiCmds[req[0]]; ok {
-			if !asciiCmd.handler(&self, target, res, asciiCmd, req, br, bw) {
+			if !asciiCmd.Handler(&self, target, res, asciiCmd, req, br, bw) {
 				return
 			}
 		} else {
@@ -126,8 +126,8 @@ func client_error(bw *bufio.Writer, msg string) bool {
 }
 
 type AsciiCmd struct {
-	opcode gomemcached.CommandCode
-    handler func(*AsciiSource, chan Request, chan *gomemcached.MCResponse,
+	Opcode gomemcached.CommandCode
+    Handler func(*AsciiSource, chan Request, chan *gomemcached.MCResponse,
 		*AsciiCmd, []string, *bufio.Reader, *bufio.Writer) bool
 }
 
@@ -164,7 +164,18 @@ var asciiCmds = map[string]*AsciiCmd{
 				return client_error(bw, "missing key\r\n")
 			}
 
-			log.Printf("get %s", key)
+			target <-Request{&gomemcached.MCRequest{Opcode: cmd.Opcode,
+				Key: []byte(key)}, res}
+			response := <-res
+			if response.Status == gomemcached.SUCCESS {
+				bw.Write([]byte("VALUE "))
+				bw.Write([]byte(response.Key))
+				bw.Write([]byte(" 0 "))
+				bw.Write([]byte(strconv.Itoa(len(response.Body))))
+				bw.Write([]byte("\r\n"))
+				bw.Write(response.Body)
+				bw.Write([]byte("\r\n"))
+			}
 
 			bw.Write([]byte("END\r\n"))
 			bw.Flush()
@@ -233,9 +244,16 @@ func AsciiCmdMutation(source *AsciiSource,
 func MemoryTargetRun(incoming chan Request) {
 	for {
 		req := <-incoming
-		log.Printf("mtr req: %s", req)
-		res := &gomemcached.MCResponse{}
-		req.res <-res
+		log.Printf("mtr req: %v", req)
+		res := &gomemcached.MCResponse{
+			Opcode: req.Req.Opcode,
+			Status: gomemcached.SUCCESS,
+			Opaque: req.Req.Opaque,
+			Cas: 0,
+			Key: req.Req.Key,
+			Body: []byte("world"),
+		}
+		req.Res <-res
 	}
 }
 
