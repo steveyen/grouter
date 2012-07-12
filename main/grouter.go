@@ -27,7 +27,7 @@ func MainServer(listen string, maxConns int) {
 
 func main() {
 	var listen *string = flag.String("listen", ":11300",
-		"local address to listen to")
+		"local address (<optional address>:port) to listen to")
 	var maxConns *int = flag.Int("max-conns", 3,
 		"max conns allowed from clients")
 	flag.Parse()
