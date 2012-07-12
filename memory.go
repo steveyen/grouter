@@ -2,7 +2,6 @@ package grouter
 
 import (
 	"encoding/binary"
-	"log"
 
 	"github.com/dustin/gomemcached"
 )
@@ -54,7 +53,6 @@ func MemoryStorageRun(incoming chan Request) {
 	s := MemoryStorage{data: make(map[string]gomemcached.MCItem)}
 	for {
 		req := <-incoming
-		log.Printf("mtr req: %v", req)
 		if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
 			h(&s, req)
 		} else {
