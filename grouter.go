@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"flag"
 	"io"
 	"log"
@@ -109,12 +110,12 @@ func (self AsciiSource) Run(s io.ReadWriter, target chan Request) {
 				return
 			}
 		} else {
-			client_error(bw, "unknown command - " + req[0])
+			AsciiClientError(bw, "unknown command - " + req[0])
 		}
 	}
 }
 
-func client_error(bw *bufio.Writer, msg string) bool {
+func AsciiClientError(bw *bufio.Writer, msg string) bool {
 	bw.Write(resultClientErrorPrefix)
 	bw.Write([]byte(msg))
 	bw.Flush()
@@ -152,11 +153,11 @@ var asciiCmds = map[string]*AsciiCmd{
 			target chan Request, res chan *gomemcached.MCResponse,
 			cmd *AsciiCmd, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 			if len(req) != 2 {
-				return client_error(bw, "expected 1 param for get command\r\n")
+				return AsciiClientError(bw, "expected 1 param for get command\r\n")
 			}
 			key := req[1]
 			if len(key) <= 0 {
-				return client_error(bw, "missing key\r\n")
+				return AsciiClientError(bw, "missing key\r\n")
 			}
 			target <-Request{
 				&gomemcached.MCRequest{
@@ -169,8 +170,10 @@ var asciiCmds = map[string]*AsciiCmd{
 			if response.Status == gomemcached.SUCCESS {
 				bw.Write([]byte("VALUE "))
 				bw.Write([]byte(response.Key))
-				bw.Write([]byte(" 0 "))
-				bw.Write([]byte(strconv.Itoa(len(response.Body))))
+				bw.Write([]byte(" "))
+				bw.Write([]byte(strconv.FormatUint(uint64(binary.BigEndian.Uint32(response.Extras)), 10)))
+				bw.Write([]byte(" "))
+				bw.Write([]byte(strconv.FormatUint(uint64(len(response.Body)), 10)))
 				bw.Write([]byte("\r\n"))
 				bw.Write(response.Body)
 				bw.Write([]byte("\r\n"))
@@ -191,31 +194,25 @@ func AsciiCmdMutation(source *AsciiSource,
 	target chan Request, res chan *gomemcached.MCResponse,
 	cmd *AsciiCmd, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 	if len(req) != 5 {
-		return client_error(bw, "expected 4 params for set command\r\n")
+		return AsciiClientError(bw, "expected 4 params for set command\r\n")
 	}
-
 	key := req[1]
 	if len(key) <= 0 {
-		return client_error(bw, "missing key\r\n")
+		return AsciiClientError(bw, "missing key\r\n")
 	}
-
-	flg, e := strconv.Atoi(req[2])
+	flg, e := strconv.ParseUint(req[2], 10, 0)
 	if e != nil {
-		return client_error(bw, "could not parse flag\r\n")
+		return AsciiClientError(bw, "could not parse flag\r\n")
 	}
-
-	exp, e := strconv.Atoi(req[3])
+	exp, e := strconv.ParseUint(req[3], 10, 0)
 	if e != nil {
-		return client_error(bw, "could not parse expiration\r\n")
+		return AsciiClientError(bw, "could not parse expiration\r\n")
 	}
-
 	nval, e := strconv.Atoi(req[4])
 	if e != nil || nval < 0 {
-		return client_error(bw, "could not parse value length\r\n")
+		return AsciiClientError(bw, "could not parse value length\r\n")
 	}
-
 	buf := make([]byte, nval + 2)
-
 	nbuf, e := io.ReadFull(br, buf)
 	if e != nil {
 		log.Printf("AsciiSource error: %s", e)
@@ -226,32 +223,93 @@ func AsciiCmdMutation(source *AsciiSource,
 		return false
 	}
 	if !bytes.Equal(buf[nbuf - 2:], crlf) {
-		return client_error(bw, "was expecting CRLF value termination\r\n")
+		return AsciiClientError(bw, "was expecting CRLF value termination\r\n")
 	}
 	val := buf[:nval]
 
-	log.Printf("set %s %d %d %d = '%s'", key, flg, exp, nval, val)
+	extras := make([]byte, 8)
+	binary.BigEndian.PutUint32(extras, uint32(flg))
+	binary.BigEndian.PutUint32(extras[4:], uint32(exp))
 
-	bw.Write([]byte("STORED\r\n"))
+	target <-Request{
+		&gomemcached.MCRequest{
+			Opcode: cmd.Opcode,
+			Key: []byte(key),
+			Extras: extras,
+			Body: val,
+		},
+		res,
+	}
+	response := <-res
+	if response.Status == gomemcached.SUCCESS {
+		bw.Write([]byte("STORED\r\n"))
+		bw.Flush()
+		return true
+	}
+	bw.Write([]byte("SERVER_ERROR\r\n"))
 	bw.Flush()
 	return true
 }
 
 // ---------------------------------------------------------
 
-func MemoryTargetRun(incoming chan Request) {
-	for {
-		req := <-incoming
-		log.Printf("mtr req: %v", req)
-		res := &gomemcached.MCResponse{
+type MemoryStorage struct {
+	data map[string]gomemcached.MCItem
+	cas  uint64
+}
+
+type MemoryStorageHandler func(s *MemoryStorage, req Request)
+
+var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
+	gomemcached.GET: func(s *MemoryStorage, req Request) {
+		ret := &gomemcached.MCResponse{
+			Opcode: req.Req.Opcode,
+			Opaque: req.Req.Opaque,
+			Key: req.Req.Key,
+		}
+		if item, ok := s.data[string(req.Req.Key)]; ok {
+			ret.Status = gomemcached.SUCCESS
+			ret.Extras = make([]byte, 4)
+			binary.BigEndian.PutUint32(ret.Extras, item.Flags)
+			ret.Cas = item.Cas
+			ret.Body = item.Data
+		} else {
+			ret.Status = gomemcached.KEY_ENOENT
+		}
+		req.Res <- ret
+	},
+	gomemcached.SET: func(s *MemoryStorage, req Request) {
+		s.cas += 1
+		s.data[string(req.Req.Key)] = gomemcached.MCItem{
+			Flags: binary.BigEndian.Uint32(req.Req.Extras),
+			Expiration: binary.BigEndian.Uint32(req.Req.Extras[4:]),
+			Cas: s.cas,
+			Data: req.Req.Body,
+		}
+		req.Res <- &gomemcached.MCResponse{
 			Opcode: req.Req.Opcode,
 			Status: gomemcached.SUCCESS,
 			Opaque: req.Req.Opaque,
-			Cas: 0,
+			Cas: s.cas,
 			Key: req.Req.Key,
-			Body: []byte("world"),
 		}
-		req.Res <-res
+	},
+}
+
+func MemoryStorageRun(incoming chan Request) {
+	s := MemoryStorage{data: make(map[string]gomemcached.MCItem)}
+	for {
+		req := <-incoming
+		log.Printf("mtr req: %v", req)
+		if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
+			h(&s, req)
+		} else {
+			req.Res <-&gomemcached.MCResponse{
+				Opcode: req.Req.Opcode,
+				Status: gomemcached.UNKNOWN_COMMAND,
+				Opaque: req.Req.Opaque,
+			}
+		}
 	}
 }
 
@@ -268,7 +326,7 @@ func MainServer(listen string, maxConns int) {
 		memoryChanSize := 5
 		memoryChanRequest := make(chan Request, memoryChanSize)
 		go func() {
-			MemoryTargetRun(memoryChanRequest)
+			MemoryStorageRun(memoryChanRequest)
 		}()
 		AcceptConns(ls, maxConns, &AsciiSource{}, memoryChanRequest)
 	}
