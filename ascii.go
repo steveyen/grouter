@@ -6,73 +6,11 @@ import (
 	"encoding/binary"
 	"io"
 	"log"
-	"net"
 	"strconv"
 	"strings"
 
 	"github.com/dustin/gomemcached"
 )
-
-type Request struct {
-	Req *gomemcached.MCRequest
-	Res chan *gomemcached.MCResponse
-}
-
-type Source interface {
-	Run(io.ReadWriter, chan Request)
-}
-
-func AcceptConns(ls net.Listener, maxConns int, source Source, target chan Request) {
-	log.Printf("accepting max conns: %d", maxConns)
-
-	chanAccepted := make(chan io.ReadWriteCloser)
-	chanClosed := make(chan io.ReadWriteCloser)
-	numConns := 0
-
-	go func() {
-		for {
-			c, e := ls.Accept()
-			if e != nil {
-				log.Printf("error from net.Listener.Accept(): %s", e)
-				close(chanAccepted)
-				return
-			}
-			chanAccepted <-c
-		}
-	}()
-
-	for {
-		if numConns < maxConns {
-			log.Printf("accepted conns: %d", numConns)
-			select {
-			case c := <-chanAccepted:
-				if c == nil {
-					log.Printf("error: can't accept more conns")
-					return
-				}
-
-				log.Printf("conn accepted")
-				numConns++
-
-				go func(s io.ReadWriteCloser) {
-					source.Run(s, target)
-					chanClosed <-s
-					s.Close()
-				}(c)
-			case <-chanClosed:
-				log.Printf("conn closed")
-				numConns--
-			}
-		} else {
-			log.Printf("reached max conns: %d", numConns)
-			<-chanClosed
-			log.Printf("conn closed")
-			numConns--
-		}
-	}
-}
-
-// ---------------------------------------------------------
 
 var (
 	crlf    = []byte("\r\n")
@@ -248,67 +186,5 @@ func AsciiCmdMutation(source *AsciiSource,
 	bw.Write([]byte("SERVER_ERROR\r\n"))
 	bw.Flush()
 	return true
-}
-
-// ---------------------------------------------------------
-
-type MemoryStorage struct {
-	data map[string]gomemcached.MCItem
-	cas  uint64
-}
-
-type MemoryStorageHandler func(s *MemoryStorage, req Request)
-
-var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
-	gomemcached.GET: func(s *MemoryStorage, req Request) {
-		ret := &gomemcached.MCResponse{
-			Opcode: req.Req.Opcode,
-			Opaque: req.Req.Opaque,
-			Key: req.Req.Key,
-		}
-		if item, ok := s.data[string(req.Req.Key)]; ok {
-			ret.Status = gomemcached.SUCCESS
-			ret.Extras = make([]byte, 4)
-			binary.BigEndian.PutUint32(ret.Extras, item.Flags)
-			ret.Cas = item.Cas
-			ret.Body = item.Data
-		} else {
-			ret.Status = gomemcached.KEY_ENOENT
-		}
-		req.Res <- ret
-	},
-	gomemcached.SET: func(s *MemoryStorage, req Request) {
-		s.cas += 1
-		s.data[string(req.Req.Key)] = gomemcached.MCItem{
-			Flags: binary.BigEndian.Uint32(req.Req.Extras),
-			Expiration: binary.BigEndian.Uint32(req.Req.Extras[4:]),
-			Cas: s.cas,
-			Data: req.Req.Body,
-		}
-		req.Res <- &gomemcached.MCResponse{
-			Opcode: req.Req.Opcode,
-			Status: gomemcached.SUCCESS,
-			Opaque: req.Req.Opaque,
-			Cas: s.cas,
-			Key: req.Req.Key,
-		}
-	},
-}
-
-func MemoryStorageRun(incoming chan Request) {
-	s := MemoryStorage{data: make(map[string]gomemcached.MCItem)}
-	for {
-		req := <-incoming
-		log.Printf("mtr req: %v", req)
-		if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
-			h(&s, req)
-		} else {
-			req.Res <-&gomemcached.MCResponse{
-				Opcode: req.Req.Opcode,
-				Status: gomemcached.UNKNOWN_COMMAND,
-				Opaque: req.Req.Opaque,
-			}
-		}
-	}
 }
 
