@@ -52,13 +52,6 @@ func (self AsciiSource) Run(s io.ReadWriter, target chan Request) {
 	}
 }
 
-func AsciiClientError(bw *bufio.Writer, msg string) bool {
-	bw.Write(resultClientErrorPrefix)
-	bw.Write([]byte(msg))
-	bw.Flush()
-	return true
-}
-
 type AsciiCmd struct {
 	Opcode gomemcached.CommandCode
     Handler func(*AsciiSource, chan Request, chan *gomemcached.MCResponse,
@@ -105,10 +98,12 @@ var asciiCmds = map[string]*AsciiCmd{
 			}
 			response := <-res
 			if response.Status == gomemcached.SUCCESS {
+				flg := uint64(binary.BigEndian.Uint32(response.Extras))
+
 				bw.Write([]byte("VALUE "))
 				bw.Write([]byte(response.Key))
 				bw.Write([]byte(" "))
-				bw.Write([]byte(strconv.FormatUint(uint64(binary.BigEndian.Uint32(response.Extras)), 10)))
+				bw.Write([]byte(strconv.FormatUint(flg, 10)))
 				bw.Write([]byte(" "))
 				bw.Write([]byte(strconv.FormatUint(uint64(len(response.Body)), 10)))
 				bw.Write([]byte("\r\n"))
@@ -184,6 +179,13 @@ func AsciiCmdMutation(source *AsciiSource,
 		return true
 	}
 	bw.Write([]byte("SERVER_ERROR\r\n"))
+	bw.Flush()
+	return true
+}
+
+func AsciiClientError(bw *bufio.Writer, msg string) bool {
+	bw.Write(resultClientErrorPrefix)
+	bw.Write([]byte(msg))
 	bw.Flush()
 	return true
 }
