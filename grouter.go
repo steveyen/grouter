@@ -154,14 +154,17 @@ var asciiCmds = map[string]*AsciiCmd{
 			if len(req) != 2 {
 				return client_error(bw, "expected 1 param for get command\r\n")
 			}
-
 			key := req[1]
 			if len(key) <= 0 {
 				return client_error(bw, "missing key\r\n")
 			}
-
-			target <-Request{&gomemcached.MCRequest{Opcode: cmd.Opcode,
-				Key: []byte(key)}, res}
+			target <-Request{
+				&gomemcached.MCRequest{
+					Opcode: cmd.Opcode,
+					Key: []byte(key),
+				},
+				res,
+			}
 			response := <-res
 			if response.Status == gomemcached.SUCCESS {
 				bw.Write([]byte("VALUE "))
@@ -172,7 +175,6 @@ var asciiCmds = map[string]*AsciiCmd{
 				bw.Write(response.Body)
 				bw.Write([]byte("\r\n"))
 			}
-
 			bw.Write([]byte("END\r\n"))
 			bw.Flush()
 			return true
