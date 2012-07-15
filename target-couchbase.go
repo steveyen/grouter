@@ -8,14 +8,14 @@ import (
 	"github.com/couchbaselabs/go-couchbase"
 )
 
-type CouchbaseStorage struct {
+type CouchbaseTarget struct {
 	Pool couchbase.Pool
 }
 
-type CouchbaseStorageHandler func(s *CouchbaseStorage, req Request, bucket *couchbase.Bucket)
+type CouchbaseTargetHandler func(s *CouchbaseTarget, req Request, bucket *couchbase.Bucket)
 
-var CouchbaseStorageHandlers = map[gomemcached.CommandCode]CouchbaseStorageHandler{
-	gomemcached.GET: func(s *CouchbaseStorage, req Request, bucket *couchbase.Bucket) {
+var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler{
+	gomemcached.GET: func(s *CouchbaseTarget, req Request, bucket *couchbase.Bucket) {
 		ret := &gomemcached.MCResponse{
 			Opcode: req.Req.Opcode,
 			Opaque: req.Req.Opaque,
@@ -26,7 +26,7 @@ var CouchbaseStorageHandlers = map[gomemcached.CommandCode]CouchbaseStorageHandl
 	},
 }
 
-func CouchbaseStorageRun(spec string, incoming chan Request) {
+func CouchbaseTargetRun(spec string, incoming chan Request) {
 	specHTTP := strings.Replace(spec, "couchbase:", "http:", 1)
 
 	client, err := couchbase.Connect(specHTTP)
@@ -39,7 +39,7 @@ func CouchbaseStorageRun(spec string, incoming chan Request) {
 		log.Fatalf("error getting default pool; err: %v", err)
 	}
 
-	s := CouchbaseStorage{Pool: pool}
+	s := CouchbaseTarget{Pool: pool}
 	for {
 		req := <-incoming
 		bucket, err := pool.GetBucket(req.Bucket)
@@ -51,7 +51,7 @@ func CouchbaseStorageRun(spec string, incoming chan Request) {
 				Opaque: req.Req.Opaque,
 			}
 		} else {
-			if h, ok := CouchbaseStorageHandlers[req.Req.Opcode]; ok {
+			if h, ok := CouchbaseTargetHandlers[req.Req.Opcode]; ok {
 				h(&s, req, bucket)
 			} else {
 				req.Res <-&gomemcached.MCResponse{

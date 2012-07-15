@@ -36,8 +36,9 @@ var sourceFuncs = map[string]func(string, int, chan grouter.Request){
 }
 
 var targetFuncs = map[string]func(string, chan grouter.Request){
-	"http":      grouter.CouchbaseStorageRun,
-	"couchbase": grouter.CouchbaseStorageRun,
+	"http":      grouter.CouchbaseTargetRun,
+	"couchbase": grouter.CouchbaseTargetRun,
+	"memcached": grouter.MemcachedTargetRun,
 	"memory":    grouter.MemoryStorageRun,
 }
 
