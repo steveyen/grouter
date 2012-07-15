@@ -44,7 +44,7 @@ func (self AsciiSource) Run(s io.ReadWriter, target chan Request) {
 				return
 			}
 		} else {
-			AsciiClientError(bw, "unknown command - " + req[0])
+			AsciiClientError(bw, "unknown command - " + req[0] + "\r\n")
 		}
 	}
 }
