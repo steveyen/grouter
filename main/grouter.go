@@ -36,10 +36,11 @@ var sourceFuncs = map[string]func(string, int, chan grouter.Request){
 }
 
 var targetFuncs = map[string]func(string, chan grouter.Request){
-	"http":      grouter.CouchbaseTargetRun,
-	"couchbase": grouter.CouchbaseTargetRun,
+	"http":             grouter.CouchbaseTargetRun,
+	"couchbase":        grouter.CouchbaseTargetRun,
+	"memcached-ascii":  grouter.MemcachedAsciiTargetRun,
 	"memcached-binary": grouter.MemcachedBinaryTargetRun,
-	"memory":    grouter.MemoryStorageRun,
+	"memory":           grouter.MemoryStorageRun,
 }
 
 func MainStart(sourceSpec string, sourceMaxConns int,

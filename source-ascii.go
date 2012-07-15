@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	crlf    = []byte("\r\n")
+	crnl    = []byte("\r\n")
 	version = []byte("VERSION grouter 0.0.0\r\n")
 )
 
@@ -152,8 +152,8 @@ func AsciiCmdMutation(source *AsciiSource,
 		log.Printf("AsciiSource nbuf error: %s", e)
 		return false
 	}
-	if !bytes.Equal(buf[nbuf - 2:], crlf) {
-		return AsciiClientError(bw, "was expecting CRLF value termination\r\n")
+	if !bytes.Equal(buf[nbuf - 2:], crnl) {
+		return AsciiClientError(bw, "was expecting CRNL value termination\r\n")
 	}
 	val := buf[:nval]
 

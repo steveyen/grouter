@@ -29,7 +29,9 @@ func MemcachedBinaryTargetRun(spec string, incoming chan Request) {
 				Opaque: req.Req.Opaque,
 			}
 
+			log.Printf("warn: memcached-binary closing conn; saw error: %v", err)
 			client.Close()
+
 			sleep := 100 * time.Millisecond
 			for {
 				client, err = memcached.Connect("tcp", spec)
