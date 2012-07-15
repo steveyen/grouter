@@ -10,7 +10,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/dustin/gomemcached"
 )
@@ -112,25 +111,17 @@ func MemcachedAsciiTargetRun(spec string, incoming chan Request) {
 
 				log.Printf("warn: memcached-ascii closing conn; saw error: %v", err)
 				conn.Close()
-
-				sleep := 100 * time.Millisecond
-				for {
-					conn, err = net.Dial("tcp", spec)
-					if err != nil {
-						if sleep > 2000 * time.Millisecond {
-							sleep = 2000 * time.Millisecond
-						}
-						log.Printf("warn: memcached-ascii reconnect failed: %s;" +
-							" sleeping (ms): %d; err: %v",
-							spec, sleep / time.Millisecond, err)
-						time.Sleep(sleep)
-						sleep = sleep * 2
-					} else {
-						br = bufio.NewReader(conn)
-						bw = bufio.NewWriter(conn)
-						break
-					}
-				}
+				conn = Reconnect(spec, func(spec string) (interface{}, error) {
+					return net.Dial("tcp", spec)
+				}).(net.Conn)
+				br = bufio.NewReader(conn)
+				bw = bufio.NewWriter(conn)
+			}
+		} else {
+			req.Res <-&gomemcached.MCResponse{
+				Opcode: req.Req.Opcode,
+				Status: gomemcached.UNKNOWN_COMMAND,
+				Opaque: req.Req.Opaque,
 			}
 		}
 	}

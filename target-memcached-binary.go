@@ -3,7 +3,6 @@ package grouter
 import (
 	"log"
 	"strings"
-	"time"
 
 	"github.com/dustin/gomemcached"
 	"github.com/dustin/gomemcached/client"
@@ -31,23 +30,9 @@ func MemcachedBinaryTargetRun(spec string, incoming chan Request) {
 
 			log.Printf("warn: memcached-binary closing conn; saw error: %v", err)
 			client.Close()
-
-			sleep := 100 * time.Millisecond
-			for {
-				client, err = memcached.Connect("tcp", spec)
-				if err != nil {
-					if sleep > 2000 * time.Millisecond {
-						sleep = 2000 * time.Millisecond
-					}
-					log.Printf("warn: memcached-binary reconnect failed: %s;" +
-						" sleeping (ms): %d; err: %v",
-						spec, sleep / time.Millisecond, err)
-					time.Sleep(sleep)
-					sleep = sleep * 2
-				} else {
-					break
-				}
-			}
+			client = Reconnect(spec, func(spec string) (interface{}, error) {
+				return memcached.Connect("tcp", spec)
+			}).(*memcached.Client)
 		} else {
 			req.Res <-res
 		}
