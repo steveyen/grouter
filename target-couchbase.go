@@ -31,12 +31,12 @@ func CouchbaseTargetRun(spec string, incoming chan Request) {
 
 	client, err := couchbase.Connect(specHTTP)
 	if err != nil {
-		log.Fatalf("error connecting to couchbase: %s; err: %v", specHTTP, err)
+		log.Fatalf("error: couchbase connect failed: %s; err: %v", specHTTP, err)
 	}
 
 	pool, err := client.GetPool("default")
 	if err != nil {
-		log.Fatalf("error getting default pool; err: %v", err)
+		log.Fatalf("error: no default pool; err: %v", err)
 	}
 
 	s := CouchbaseTarget{Pool: pool}

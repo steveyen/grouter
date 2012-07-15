@@ -29,7 +29,7 @@ func AcceptConns(ls net.Listener, maxConns int, source Source, target chan Reque
 		for {
 			c, e := ls.Accept()
 			if e != nil {
-				log.Printf("error from net.Listener.Accept(): %s", e)
+				log.Printf("error: net.Listener.Accept() failed: %s", e)
 				close(chanAccepted)
 				return
 			}
