@@ -13,14 +13,19 @@ func NetListenSourceFunc(source grouter.Source)func(string, int, chan grouter.Re
 	return func(sourceSpec string, sourceMaxConns int,
 		targetChan chan grouter.Request) {
 		sourceParts := strings.Split(sourceSpec, ":")
-		listen := strings.Join(sourceParts[1:], ":")
-		ls, e := net.Listen("tcp", listen)
-		if e != nil {
-			log.Fatalf("error: could not listen on: %s; error: %s", listen, e)
+		if len(sourceParts) == 3 {
+			listen := strings.Join(sourceParts[1:], ":")
+			ls, e := net.Listen("tcp", listen)
+			if e != nil {
+				log.Fatalf("error: could not listen on: %s; error: %s", listen, e)
+			} else {
+				defer ls.Close()
+				log.Printf("listening to: %s", listen)
+				grouter.AcceptConns(ls, sourceMaxConns, source, targetChan)
+			}
 		} else {
-			defer ls.Close()
-			log.Printf("listening to: %s", listen)
-			grouter.AcceptConns(ls, sourceMaxConns, source, targetChan)
+			log.Fatalf("error: missing listen HOST:PORT; instead, got: %v",
+				strings.Join(sourceParts[1:], ":"))
 		}
 	}
 }
