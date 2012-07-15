@@ -15,9 +15,6 @@ import (
 var (
 	crlf    = []byte("\r\n")
 	version = []byte("VERSION grouter 0.0.0\r\n")
-
-	resultClientErrorPrefix = []byte("CLIENT_ERROR ")
-	resultServerErrorPrefix = []byte("SERVER_ERROR ")
 )
 
 type AsciiSource struct {
@@ -184,7 +181,7 @@ func AsciiCmdMutation(source *AsciiSource,
 }
 
 func AsciiClientError(bw *bufio.Writer, msg string) bool {
-	bw.Write(resultClientErrorPrefix)
+	bw.Write([]byte("CLIENT_ERROR "))
 	bw.Write([]byte(msg))
 	bw.Flush()
 	return true
