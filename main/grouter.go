@@ -56,16 +56,18 @@ func MainStart(sourceSpec string, sourceMaxConns int,
 
 func main() {
 	sourceSpec := flag.String("source", "memcached-ascii::11300",
-		"source of requests, KIND(:PARAMS); examples...\n" +
-		"  memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT")
+		"source of requests\n" +
+		"    in the format of KIND[:PARAMS] like...\n" +
+		"      memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT")
 	sourceMaxConns := flag.Int("source-max-conns", 3,
 		"max conns allowed from source")
 	targetSpec := flag.String("target", "memory:",
-		"target of requests, KIND(:PARAMS); examples...\n" +
-		"  memory:\n" +
-		"  memcached:HOST:PORT")
+		"target of requests\n" +
+		"    in the format of KIND[:PARAMS] like...\n" +
+		"      memory:\n" +
+		"      memcached:HOST:PORT")
 	targetChanSize := flag.Int("target-chan-size", 5,
-		"target chan size")
+		"target chan size to control concurrency")
 	flag.Parse()
 	MainStart(*sourceSpec, *sourceMaxConns, *targetSpec, *targetChanSize)
 }
