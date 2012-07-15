@@ -10,8 +10,7 @@ import (
 )
 
 func NetListenSourceFunc(source grouter.Source)func(string, int, chan grouter.Request) {
-	return func(sourceSpec string, sourceMaxConns int,
-		targetChan chan grouter.Request) {
+	return func(sourceSpec string, sourceMaxConns int, targetChan chan grouter.Request) {
 		sourceParts := strings.Split(sourceSpec, ":")
 		if len(sourceParts) == 3 {
 			listen := strings.Join(sourceParts[1:], ":")
@@ -72,6 +71,7 @@ func main() {
 		"      memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT")
 	sourceMaxConns := flag.Int("source-max-conns", 3,
 		"max conns allowed from source")
+
 	targetSpec := flag.String("target", "memory:",
 		"target of requests\n" +
 		"    in the format of KIND[:PARAMS] like...\n" +
@@ -79,6 +79,7 @@ func main() {
 		"      memcached:HOST:PORT")
 	targetChanSize := flag.Int("target-chan-size", 5,
 		"target chan size to control concurrency")
+
 	flag.Parse()
 	MainStart(*sourceSpec, *sourceMaxConns, *targetSpec, *targetChanSize)
 }
