@@ -71,17 +71,17 @@ func main() {
 		"source of requests\n" +
 		"    which should follow a format of KIND[:PARAMS] like...\n" +
 		"      memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT\n" +
-		"      workload:")
+		"      workload")
 	sourceMaxConns := flag.Int("source-max-conns", 3,
 		"max conns allowed from source")
 
-	targetSpec := flag.String("target", "memory:",
+	targetSpec := flag.String("target", "memory",
 		"target of requests\n" +
 		"    which should follow a format of KIND[:PARAMS] like...\n" +
 		"      http:\\\\COUCHBASE_HOST:COUCHBASE_PORT\n" +
 		"      couchbase:\\\\COUCHBASE_HOST:COUCHBASE_PORT\n" +
 		"      memcached:HOST:PORT\n" +
-		"      memory:")
+		"      memory")
 	targetChanSize := flag.Int("target-chan-size", 5,
 		"target chan size to control concurrency")
 
