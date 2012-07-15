@@ -7,7 +7,7 @@ import (
 )
 
 func WorkLoad(sourceSpec string, sourceMaxConns int, targetChan chan Request) {
-	if sourceMaxConns > 0 {
+	if sourceMaxConns > 1 {
 		go WorkLoad(sourceSpec, sourceMaxConns - 1, targetChan)
 	}
 
