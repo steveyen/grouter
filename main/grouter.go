@@ -33,6 +33,7 @@ func NetListenSourceFunc(source grouter.Source)func(string, int, chan grouter.Re
 var sourceFuncs = map[string]func(string, int, chan grouter.Request){
 	"memcached":       NetListenSourceFunc(&grouter.AsciiSource{}),
 	"memcached-ascii": NetListenSourceFunc(&grouter.AsciiSource{}),
+	"workload":        grouter.WorkLoad,
 }
 
 var targetFuncs = map[string]func(string, chan grouter.Request){
