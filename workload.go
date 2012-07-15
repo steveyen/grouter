@@ -19,6 +19,7 @@ func WorkLoad(sourceSpec string, sourceMaxConns int, targetChan chan Request) {
 	res := make(chan *gomemcached.MCResponse)
 	for {
 		targetChan <-Request{
+			"default",
 			&gomemcached.MCRequest{
 				Opcode: gomemcached.GET,
 				Key: []byte("hello"),

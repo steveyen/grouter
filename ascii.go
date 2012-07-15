@@ -87,6 +87,7 @@ var asciiCmds = map[string]*AsciiCmd{
 				return AsciiClientError(bw, "missing key\r\n")
 			}
 			target <-Request{
+				"default",
 				&gomemcached.MCRequest{
 					Opcode: cmd.Opcode,
 					Key: []byte(key),
@@ -161,6 +162,7 @@ func AsciiCmdMutation(source *AsciiSource,
 	binary.BigEndian.PutUint32(extras[4:], uint32(exp))
 
 	target <-Request{
+		"default",
 		&gomemcached.MCRequest{
 			Opcode: cmd.Opcode,
 			Key: []byte(key),

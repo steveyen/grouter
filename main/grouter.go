@@ -36,7 +36,9 @@ var sourceFuncs = map[string]func(string, int, chan grouter.Request){
 }
 
 var targetFuncs = map[string]func(string, chan grouter.Request){
-	"memory": grouter.MemoryStorageRun,
+	"http":      grouter.CouchbaseStorageRun,
+	"couchbase": grouter.CouchbaseStorageRun,
+	"memory":    grouter.MemoryStorageRun,
 }
 
 func MainStart(sourceSpec string, sourceMaxConns int,
@@ -67,16 +69,19 @@ func MainStart(sourceSpec string, sourceMaxConns int,
 func main() {
 	sourceSpec := flag.String("source", "memcached-ascii::11300",
 		"source of requests\n" +
-		"    in the format of KIND[:PARAMS] like...\n" +
-		"      memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT")
+		"    which should follow a format of KIND[:PARAMS] like...\n" +
+		"      memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT\n" +
+		"      workload:")
 	sourceMaxConns := flag.Int("source-max-conns", 3,
 		"max conns allowed from source")
 
 	targetSpec := flag.String("target", "memory:",
 		"target of requests\n" +
-		"    in the format of KIND[:PARAMS] like...\n" +
-		"      memory:\n" +
-		"      memcached:HOST:PORT")
+		"    which should follow a format of KIND[:PARAMS] like...\n" +
+		"      http:\\\\COUCHBASE_HOST:COUCHBASE_PORT\n" +
+		"      couchbase:\\\\COUCHBASE_HOST:COUCHBASE_PORT\n" +
+		"      memcached:HOST:PORT\n" +
+		"      memory:")
 	targetChanSize := flag.Int("target-chan-size", 5,
 		"target chan size to control concurrency")
 

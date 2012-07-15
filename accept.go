@@ -9,6 +9,7 @@ import (
 )
 
 type Request struct {
+	Bucket string
 	Req *gomemcached.MCRequest
 	Res chan *gomemcached.MCResponse
 }
