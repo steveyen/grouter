@@ -9,9 +9,9 @@ import (
 	"github.com/steveyen/grouter"
 )
 
-var sourceFuncs = map[string]func(string, int, chan grouter.Request){
-	"memcached-ascii":
-	func(sourceSpec string, sourceMaxConns int, targetChan chan grouter.Request) {
+func NetListenSourceFunc(source grouter.Source)func(string, int, chan grouter.Request) {
+	return func(sourceSpec string, sourceMaxConns int,
+		targetChan chan grouter.Request) {
 		sourceParts := strings.Split(sourceSpec, ":")
 		listen := strings.Join(sourceParts[1:], ":")
 		ls, e := net.Listen("tcp", listen)
@@ -20,9 +20,14 @@ var sourceFuncs = map[string]func(string, int, chan grouter.Request){
 		} else {
 			defer ls.Close()
 			log.Printf("listening to: %s", listen)
-			grouter.AcceptConns(ls, sourceMaxConns, &grouter.AsciiSource{}, targetChan)
+			grouter.AcceptConns(ls, sourceMaxConns, source, targetChan)
 		}
-	},
+	}
+}
+
+var sourceFuncs = map[string]func(string, int, chan grouter.Request){
+	"memcached":       NetListenSourceFunc(&grouter.AsciiSource{}),
+	"memcached-ascii": NetListenSourceFunc(&grouter.AsciiSource{}),
 }
 
 var targetFuncs = map[string]func(string, chan grouter.Request){
