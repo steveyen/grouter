@@ -94,10 +94,10 @@ func main() {
 
 func EndPointExamples(m map[string]EndPoint) (rv string) {
 	mk := make([]string, len(m))
-    i := 0
+	i := 0
     for k, _ := range m {
-        mk[i] = k
-        i++
+		mk[i] = k
+		i++
     }
     sort.Strings(mk)
 	rv = ""
