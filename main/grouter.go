@@ -3,39 +3,18 @@ package main
 import (
 	"flag"
 	"log"
-	"net"
 	"strings"
 
 	"github.com/steveyen/grouter"
 )
 
-func NetListenSourceFunc(source grouter.Source)func(string, int, chan []grouter.Request) {
-	return func(sourceSpec string, sourceMaxConns int, targetChan chan []grouter.Request) {
-		sourceParts := strings.Split(sourceSpec, ":")
-		if len(sourceParts) == 3 {
-			listen := strings.Join(sourceParts[1:], ":")
-			ls, e := net.Listen("tcp", listen)
-			if e != nil {
-				log.Fatalf("error: could not listen on: %s; error: %s", listen, e)
-			} else {
-				defer ls.Close()
-				log.Printf("listening to: %s", listen)
-				grouter.AcceptConns(ls, sourceMaxConns, source, targetChan)
-			}
-		} else {
-			log.Fatalf("error: missing listen HOST:PORT; instead, got: %v",
-				strings.Join(sourceParts[1:], ":"))
-		}
-	}
-}
-
-var sourceFuncs = map[string]func(string, int, chan []grouter.Request){
-	"memcached":       NetListenSourceFunc(&grouter.AsciiSource{}),
-	"memcached-ascii": NetListenSourceFunc(&grouter.AsciiSource{}),
+var SourceFuncs = map[string]func(string, int, chan []grouter.Request){
+	"memcached":       grouter.NetListenSourceFunc(&grouter.AsciiSource{}),
+	"memcached-ascii": grouter.NetListenSourceFunc(&grouter.AsciiSource{}),
 	"workload":        grouter.WorkLoad,
 }
 
-var targetFuncs = map[string]func(string, chan []grouter.Request){
+var TargetFuncs = map[string]func(string, chan []grouter.Request){
 	"http":             grouter.CouchbaseTargetRun,
 	"couchbase":        grouter.CouchbaseTargetRun,
 	"memcached-ascii":  grouter.MemcachedAsciiTargetRun,
@@ -52,9 +31,9 @@ func MainStart(sourceSpec string, sourceMaxConns int,
 	log.Printf("    targetChanSize: %v", targetChanSize)
 
 	sourceKind := strings.Split(sourceSpec, ":")[0]
-	if sourceFunc, ok := sourceFuncs[sourceKind]; ok {
+	if sourceFunc, ok := SourceFuncs[sourceKind]; ok {
 		targetKind := strings.Split(targetSpec, ":")[0]
-		if targetFunc, ok := targetFuncs[targetKind]; ok {
+		if targetFunc, ok := TargetFuncs[targetKind]; ok {
 			targetChan := make(chan []grouter.Request, targetChanSize)
 			go func() {
 				targetFunc(targetSpec, targetChan)

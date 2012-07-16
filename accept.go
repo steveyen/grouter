@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/dustin/gomemcached"
@@ -89,4 +90,24 @@ func Reconnect(spec string, dialer func(string) (interface{}, error)) interface{
 	}
 
 	return nil // Unreachable.
+}
+
+func NetListenSourceFunc(source Source)func(string, int, chan []Request) {
+	return func(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
+		sourceParts := strings.Split(sourceSpec, ":")
+		if len(sourceParts) == 3 {
+			listen := strings.Join(sourceParts[1:], ":")
+			ls, e := net.Listen("tcp", listen)
+			if e != nil {
+				log.Fatalf("error: could not listen on: %s; error: %s", listen, e)
+			} else {
+				defer ls.Close()
+				log.Printf("listening to: %s", listen)
+				AcceptConns(ls, sourceMaxConns, source, targetChan)
+			}
+		} else {
+			log.Fatalf("error: missing listen HOST:PORT; instead, got: %v",
+				strings.Join(sourceParts[1:], ":"))
+		}
+	}
 }
