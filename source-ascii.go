@@ -100,7 +100,7 @@ var asciiCmds = map[string]*AsciiCmd{
 				flg := uint64(binary.BigEndian.Uint32(response.Extras))
 
 				bw.Write([]byte("VALUE "))
-				bw.Write([]byte(response.Key))
+				bw.Write(response.Key)
 				bw.Write(space)
 				bw.Write([]byte(strconv.FormatUint(flg, 10)))
 				bw.Write(space)
