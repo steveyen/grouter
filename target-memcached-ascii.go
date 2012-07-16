@@ -181,7 +181,7 @@ func AsciiTargetReadLines(br *bufio.Reader, req Request) (int, []string, error) 
 	return numValues, nil, fmt.Errorf("error: unreachable was reached")
 }
 
-func MemcachedAsciiTargetRun(spec string, concurrency int, incoming chan []Request) {
+func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request) {
 	spec = strings.Replace(spec, "memcached-ascii:", "", 1)
 
 	conn, err := net.Dial("tcp", spec)

@@ -29,8 +29,8 @@ type Source interface {
 }
 
 // Returns a source func that net.Listen()'s and accepts conns.
-func MakeListenSourceFunc(source Source)func(string, int, chan []Request) {
-	return func(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
+func MakeListenSourceFunc(source Source)func(string, Params, chan []Request) {
+	return func(sourceSpec string, params Params, targetChan chan []Request) {
 		sourceParts := strings.Split(sourceSpec, ":")
 		if len(sourceParts) == 3 {
 			listen := strings.Join(sourceParts[1:], ":")
@@ -40,7 +40,7 @@ func MakeListenSourceFunc(source Source)func(string, int, chan []Request) {
 			} else {
 				defer ls.Close()
 				log.Printf("listening to: %s", listen)
-				AcceptConns(ls, sourceMaxConns, source, targetChan)
+				AcceptConns(ls, params.SourceMaxConns, source, targetChan)
 			}
 		} else {
 			log.Fatalf("error: missing listen HOST:PORT; instead, got: %v",

@@ -7,9 +7,13 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-func WorkLoad(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
+func WorkLoad(sourceSpec string, params Params, targetChan chan []Request) {
+	workLoad(sourceSpec, params.SourceMaxConns, targetChan)
+}
+
+func workLoad(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
 	if sourceMaxConns > 1 {
-		go WorkLoad(sourceSpec, sourceMaxConns - 1, targetChan)
+		go workLoad(sourceSpec, sourceMaxConns - 1, targetChan)
 	}
 
 	start := time.Now()

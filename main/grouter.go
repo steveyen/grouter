@@ -11,7 +11,7 @@ import (
 
 type EndPoint struct {
 	Usage string
-	Func func(string, int, chan []grouter.Request)
+	Func func(string, grouter.Params, chan []grouter.Request)
 }
 
 // Available sources of requests.
@@ -85,9 +85,9 @@ func MainStart(params grouter.Params) {
 		if target, ok := Targets[targetKind]; ok {
 			targetChan := make(chan []grouter.Request, params.TargetChanSize)
 			go func() {
-				target.Func(params.TargetSpec, params.TargetChanSize, targetChan)
+				target.Func(params.TargetSpec, params, targetChan)
 			}()
-			source.Func(params.SourceSpec, params.SourceMaxConns, targetChan)
+			source.Func(params.SourceSpec, params, targetChan)
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
 		}
