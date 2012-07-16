@@ -10,8 +10,8 @@ import (
 
 // Available sources of requests.
 var SourceFuncs = map[string]func(string, int, chan []grouter.Request){
-	"memcached":       grouter.NetListenSourceFunc(&grouter.AsciiSource{}),
-	"memcached-ascii": grouter.NetListenSourceFunc(&grouter.AsciiSource{}),
+	"memcached":       grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
+	"memcached-ascii": grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
 	"workload":        grouter.WorkLoad,
 }
 
