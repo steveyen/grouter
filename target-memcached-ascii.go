@@ -14,16 +14,25 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
+var (
+	prefix_get = []byte("get ")
+	prefix_set = []byte("set ")
+	prefix_add = []byte("add ")
+	prefix_replace = []byte("replace ")
+	prefix_prepend = []byte("prepend ")
+	prefix_append = []byte("append ")
+)
+
 type MemcachedAsciiTargetHandler func(*bufio.Reader, *bufio.Writer, Request) error
 
 var MemcachedAsciiTargetHandlers = map[gomemcached.CommandCode]MemcachedAsciiTargetHandler{
 	gomemcached.GET: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-		bw.Write([]byte("get "))
+		bw.Write(prefix_get)
 		bw.Write(req.Req.Key)
 		bw.Write(crnl)
 		bw.Flush()
 
-		numValues, endParts, err := AsciiReadLines(br, req)
+		numValues, endParts, err := AsciiTargetReadLines(br, req)
 		if err != nil {
 			return err
 		}
@@ -47,56 +56,73 @@ var MemcachedAsciiTargetHandlers = map[gomemcached.CommandCode]MemcachedAsciiTar
 		return nil
 	},
 	gomemcached.SET: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-		flg := uint64(binary.BigEndian.Uint32(req.Req.Extras))
-		exp := uint64(binary.BigEndian.Uint32(req.Req.Extras[4:]))
-
-		bw.Write([]byte("set "))
-		bw.Write(req.Req.Key)
-		bw.Write(space)
-		bw.Write([]byte(strconv.FormatUint(flg, 10)))
-		bw.Write(space)
-		bw.Write([]byte(strconv.FormatUint(exp, 10)))
-		bw.Write(space)
-		bw.Write([]byte(strconv.FormatUint(uint64(len(req.Req.Body)), 10)))
-		bw.Write(crnl)
-		bw.Write(req.Req.Body)
-		bw.Write(crnl)
-		bw.Flush()
-
-		line, isPrefix, err := br.ReadLine()
-		if err != nil {
-			return err
-		}
-		if isPrefix {
-			return fmt.Errorf("error: line is too long")
-		}
-		if string(line) == "STORED" {
-			req.Res <-&gomemcached.MCResponse{
-				Opcode: req.Req.Opcode,
-				Status: gomemcached.SUCCESS,
-				Opaque: req.Req.Opaque,
-				Key: req.Req.Key,
-			}
-		} else if string(line) == "NOT_STORED" {
-			req.Res <-&gomemcached.MCResponse{
-				Opcode: req.Req.Opcode,
-				Status: gomemcached.NOT_STORED,
-				Opaque: req.Req.Opaque,
-				Key: req.Req.Key,
-			}
-		} else {
-			req.Res <-&gomemcached.MCResponse{
-				Opcode: req.Req.Opcode,
-				Status: gomemcached.EINVAL,
-				Opaque: req.Req.Opaque,
-				Key: req.Req.Key,
-			}
-		}
-		return nil
+		return AsciiTargetMutation(br, bw, req, prefix_set)
+	},
+	gomemcached.ADD: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+		return AsciiTargetMutation(br, bw, req, prefix_add)
+	},
+	gomemcached.REPLACE: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+		return AsciiTargetMutation(br, bw, req, prefix_replace)
+	},
+	gomemcached.PREPEND: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+		return AsciiTargetMutation(br, bw, req, prefix_prepend)
+	},
+	gomemcached.APPEND: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+		return AsciiTargetMutation(br, bw, req, prefix_append)
 	},
 }
 
-func AsciiReadLines(br *bufio.Reader, req Request) (int, []string, error) {
+func AsciiTargetMutation(br *bufio.Reader, bw *bufio.Writer,
+	req Request, cmd []byte) error {
+	flg := uint64(binary.BigEndian.Uint32(req.Req.Extras))
+	exp := uint64(binary.BigEndian.Uint32(req.Req.Extras[4:]))
+
+	bw.Write(cmd)
+	bw.Write(req.Req.Key)
+	bw.Write(space)
+	bw.Write([]byte(strconv.FormatUint(flg, 10)))
+	bw.Write(space)
+	bw.Write([]byte(strconv.FormatUint(exp, 10)))
+	bw.Write(space)
+	bw.Write([]byte(strconv.FormatUint(uint64(len(req.Req.Body)), 10)))
+	bw.Write(crnl)
+	bw.Write(req.Req.Body)
+	bw.Write(crnl)
+	bw.Flush()
+
+	line, isPrefix, err := br.ReadLine()
+	if err != nil {
+		return err
+	}
+	if isPrefix {
+		return fmt.Errorf("error: line is too long")
+	}
+	if string(line) == "STORED" {
+		req.Res <-&gomemcached.MCResponse{
+			Opcode: req.Req.Opcode,
+			Status: gomemcached.SUCCESS,
+			Opaque: req.Req.Opaque,
+			Key: req.Req.Key,
+		}
+	} else if string(line) == "NOT_STORED" {
+		req.Res <-&gomemcached.MCResponse{
+			Opcode: req.Req.Opcode,
+			Status: gomemcached.NOT_STORED,
+			Opaque: req.Req.Opaque,
+			Key: req.Req.Key,
+		}
+	} else {
+		req.Res <-&gomemcached.MCResponse{
+			Opcode: req.Req.Opcode,
+			Status: gomemcached.EINVAL,
+			Opaque: req.Req.Opaque,
+			Key: req.Req.Key,
+		}
+	}
+	return nil
+}
+
+func AsciiTargetReadLines(br *bufio.Reader, req Request) (int, []string, error) {
 	numValues := 0
 
 	for {
