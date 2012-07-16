@@ -116,3 +116,25 @@ func Reconnect(spec string, dialer func(string) (interface{}, error)) interface{
 	return nil // Unreachable.
 }
 
+func BatchRequests(incoming chan []Request, outgoing chan []Request) {
+	var batch []Request
+
+	for {
+		if batch != nil && len(batch) > 0 {
+			if len(batch) >= cap(batch) {
+				outgoing <-batch
+				batch = nil
+			} else {
+				select {
+				case outgoing <-batch:
+						batch = nil
+				case reqs := <-incoming:
+					batch.join(requests)
+				}
+			}
+		} else {
+			reqs := <-incoming
+			batch.join(requests)
+		}
+	}
+}
