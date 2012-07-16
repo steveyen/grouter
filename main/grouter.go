@@ -9,14 +9,6 @@ import (
 	"github.com/steveyen/grouter"
 )
 
-type Params struct {
-	sourceSpec string
-	sourceMaxConns int
-
-	targetSpec string
-	targetChanSize int
-}
-
 type EndPoint struct {
 	Usage string
 	Func func(string, int, chan []grouter.Request)
@@ -56,30 +48,6 @@ var Targets = map[string]EndPoint{
 	"memory": EndPoint{"memory", grouter.MemoryStorageRun},
 }
 
-func MainStart(params Params) {
-	log.Printf("grouter")
-	log.Printf("  source: %v", params.sourceSpec)
-	log.Printf("    sourceMaxConns: %v", params.sourceMaxConns)
-	log.Printf("  target: %v", params.targetSpec)
-	log.Printf("    targetChanSize: %v", params.targetChanSize)
-
-	sourceKind := strings.Split(params.sourceSpec, ":")[0]
-	if source, ok := Sources[sourceKind]; ok {
-		targetKind := strings.Split(params.targetSpec, ":")[0]
-		if target, ok := Targets[targetKind]; ok {
-			targetChan := make(chan []grouter.Request, params.targetChanSize)
-			go func() {
-				target.Func(params.targetSpec, params.targetChanSize, targetChan)
-			}()
-			source.Func(params.sourceSpec, params.sourceMaxConns, targetChan)
-		} else {
-			log.Fatalf("error: unknown target kind: %s", params.targetSpec)
-		}
-	} else {
-		log.Fatalf("error: unknown source kind: %s", params.sourceSpec)
-	}
-}
-
 func main() {
 	sourceSpec := flag.String("source", "memcached-ascii::11300",
 		"source of requests\n" +
@@ -96,12 +64,36 @@ func main() {
 		"target chan size to control concurrency")
 
 	flag.Parse()
-	MainStart(Params{
-		sourceSpec:     *sourceSpec,
-		sourceMaxConns: *sourceMaxConns,
-		targetSpec:     *targetSpec,
-		targetChanSize: *targetChanSize,
+	MainStart(grouter.Params{
+		SourceSpec:     *sourceSpec,
+		SourceMaxConns: *sourceMaxConns,
+		TargetSpec:     *targetSpec,
+		TargetChanSize: *targetChanSize,
 	})
+}
+
+func MainStart(params grouter.Params) {
+	log.Printf("grouter")
+	log.Printf("  source: %v", params.SourceSpec)
+	log.Printf("    sourceMaxConns: %v", params.SourceMaxConns)
+	log.Printf("  target: %v", params.TargetSpec)
+	log.Printf("    targetChanSize: %v", params.TargetChanSize)
+
+	sourceKind := strings.Split(params.SourceSpec, ":")[0]
+	if source, ok := Sources[sourceKind]; ok {
+		targetKind := strings.Split(params.TargetSpec, ":")[0]
+		if target, ok := Targets[targetKind]; ok {
+			targetChan := make(chan []grouter.Request, params.TargetChanSize)
+			go func() {
+				target.Func(params.TargetSpec, params.TargetChanSize, targetChan)
+			}()
+			source.Func(params.SourceSpec, params.SourceMaxConns, targetChan)
+		} else {
+			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
+		}
+	} else {
+		log.Fatalf("error: unknown source kind: %s", params.SourceSpec)
+	}
 }
 
 func EndPointExamples(m map[string]EndPoint) (rv string) {

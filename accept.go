@@ -10,6 +10,14 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
+type Params struct {
+	SourceSpec string
+	SourceMaxConns int
+
+	TargetSpec string
+	TargetChanSize int
+}
+
 type Request struct {
 	Bucket string
 	Req *gomemcached.MCRequest
