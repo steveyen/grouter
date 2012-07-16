@@ -9,8 +9,8 @@ import (
 	"github.com/steveyen/grouter"
 )
 
-func NetListenSourceFunc(source grouter.Source)func(string, int, chan grouter.Request) {
-	return func(sourceSpec string, sourceMaxConns int, targetChan chan grouter.Request) {
+func NetListenSourceFunc(source grouter.Source)func(string, int, chan []grouter.Request) {
+	return func(sourceSpec string, sourceMaxConns int, targetChan chan []grouter.Request) {
 		sourceParts := strings.Split(sourceSpec, ":")
 		if len(sourceParts) == 3 {
 			listen := strings.Join(sourceParts[1:], ":")
@@ -29,13 +29,13 @@ func NetListenSourceFunc(source grouter.Source)func(string, int, chan grouter.Re
 	}
 }
 
-var sourceFuncs = map[string]func(string, int, chan grouter.Request){
+var sourceFuncs = map[string]func(string, int, chan []grouter.Request){
 	"memcached":       NetListenSourceFunc(&grouter.AsciiSource{}),
 	"memcached-ascii": NetListenSourceFunc(&grouter.AsciiSource{}),
 	"workload":        grouter.WorkLoad,
 }
 
-var targetFuncs = map[string]func(string, chan grouter.Request){
+var targetFuncs = map[string]func(string, chan []grouter.Request){
 	"http":             grouter.CouchbaseTargetRun,
 	"couchbase":        grouter.CouchbaseTargetRun,
 	"memcached-ascii":  grouter.MemcachedAsciiTargetRun,
@@ -55,7 +55,7 @@ func MainStart(sourceSpec string, sourceMaxConns int,
 	if sourceFunc, ok := sourceFuncs[sourceKind]; ok {
 		targetKind := strings.Split(targetSpec, ":")[0]
 		if targetFunc, ok := targetFuncs[targetKind]; ok {
-			targetChan := make(chan grouter.Request, targetChanSize)
+			targetChan := make(chan []grouter.Request, targetChanSize)
 			go func() {
 				targetFunc(targetSpec, targetChan)
 			}()

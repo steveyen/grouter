@@ -7,7 +7,7 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-func WorkLoad(sourceSpec string, sourceMaxConns int, targetChan chan Request) {
+func WorkLoad(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
 	if sourceMaxConns > 1 {
 		go WorkLoad(sourceSpec, sourceMaxConns - 1, targetChan)
 	}
@@ -18,7 +18,8 @@ func WorkLoad(sourceSpec string, sourceMaxConns int, targetChan chan Request) {
 	i := 0
 	res := make(chan *gomemcached.MCResponse)
 	for {
-		targetChan <-Request{
+		reqs := make([]Request, 1)
+		reqs[0] = Request{
 			"default",
 			&gomemcached.MCRequest{
 				Opcode: gomemcached.GET,
@@ -26,6 +27,7 @@ func WorkLoad(sourceSpec string, sourceMaxConns int, targetChan chan Request) {
 			},
 			res,
 		}
+		targetChan <-reqs
 		<-res
 		i++
 

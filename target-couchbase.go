@@ -8,14 +8,10 @@ import (
 	"github.com/couchbaselabs/go-couchbase"
 )
 
-type CouchbaseTarget struct {
-	Pool couchbase.Pool
-}
-
-type CouchbaseTargetHandler func(s *CouchbaseTarget, req Request, bucket *couchbase.Bucket)
+type CouchbaseTargetHandler func(req Request, bucket *couchbase.Bucket)
 
 var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler{
-	gomemcached.GET: func(s *CouchbaseTarget, req Request, bucket *couchbase.Bucket) {
+	gomemcached.GET: func(req Request, bucket *couchbase.Bucket) {
 		ret := &gomemcached.MCResponse{
 			Opcode: req.Req.Opcode,
 			Opaque: req.Req.Opaque,
@@ -26,7 +22,7 @@ var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler
 	},
 }
 
-func CouchbaseTargetRun(spec string, incoming chan Request) {
+func CouchbaseTargetRun(spec string, incoming chan []Request) {
 	specHTTP := strings.Replace(spec, "couchbase:", "http:", 1)
 
 	client, err := couchbase.Connect(specHTTP)
@@ -39,25 +35,26 @@ func CouchbaseTargetRun(spec string, incoming chan Request) {
 		log.Fatalf("error: no default pool; err: %v", err)
 	}
 
-	s := CouchbaseTarget{Pool: pool}
 	for {
-		req := <-incoming
-		bucket, err := pool.GetBucket(req.Bucket)
-		if err != nil {
-			log.Printf("warn: missing bucket: %s; err: %v", req.Bucket, err)
-			req.Res <-&gomemcached.MCResponse{
-				Opcode: req.Req.Opcode,
-				Status: gomemcached.EINVAL,
-				Opaque: req.Req.Opaque,
-			}
-		} else {
-			if h, ok := CouchbaseTargetHandlers[req.Req.Opcode]; ok {
-				h(&s, req, bucket)
-			} else {
+		reqs := <-incoming
+		for _, req := range reqs {
+			bucket, err := pool.GetBucket(req.Bucket)
+			if err != nil {
+				log.Printf("warn: missing bucket: %s; err: %v", req.Bucket, err)
 				req.Res <-&gomemcached.MCResponse{
 					Opcode: req.Req.Opcode,
-					Status: gomemcached.UNKNOWN_COMMAND,
+					Status: gomemcached.EINVAL,
 					Opaque: req.Req.Opaque,
+				}
+			} else {
+			if h, ok := CouchbaseTargetHandlers[req.Req.Opcode]; ok {
+					h(req, bucket)
+				} else {
+					req.Res <-&gomemcached.MCResponse{
+						Opcode: req.Req.Opcode,
+						Status: gomemcached.UNKNOWN_COMMAND,
+						Opaque: req.Req.Opaque,
+					}
 				}
 			}
 		}

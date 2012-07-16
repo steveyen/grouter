@@ -15,10 +15,10 @@ type Request struct {
 }
 
 type Source interface {
-	Run(io.ReadWriter, chan Request)
+	Run(io.ReadWriter, chan []Request)
 }
 
-func AcceptConns(ls net.Listener, maxConns int, source Source, target chan Request) {
+func AcceptConns(ls net.Listener, maxConns int, source Source, targetChan chan []Request) {
 	log.Printf("accepting max conns: %d", maxConns)
 
 	chanAccepted := make(chan io.ReadWriteCloser)
@@ -51,7 +51,7 @@ func AcceptConns(ls net.Listener, maxConns int, source Source, target chan Reque
 				numConns++
 
 				go func(s io.ReadWriteCloser) {
-					source.Run(s, target)
+					source.Run(s, targetChan)
 					chanClosed <-s
 					s.Close()
 				}(c)

@@ -21,7 +21,7 @@ var (
 type AsciiSource struct {
 }
 
-func (self AsciiSource) Run(s io.ReadWriter, target chan Request) {
+func (self AsciiSource) Run(s io.ReadWriter, targetChan chan []Request) {
 	br := bufio.NewReader(s)
 	bw := bufio.NewWriter(s)
 	res := make(chan *gomemcached.MCResponse)
@@ -41,7 +41,7 @@ func (self AsciiSource) Run(s io.ReadWriter, target chan Request) {
 
 		req := strings.Split(strings.TrimSpace(string(buf)), " ")
 		if asciiCmd, ok := asciiCmds[req[0]]; ok {
-			if !asciiCmd.Handler(&self, target, res, asciiCmd, req, br, bw) {
+			if !asciiCmd.Handler(&self, targetChan, res, asciiCmd, req, br, bw) {
 				return
 			}
 		} else {
@@ -52,7 +52,7 @@ func (self AsciiSource) Run(s io.ReadWriter, target chan Request) {
 
 type AsciiCmd struct {
 	Opcode gomemcached.CommandCode
-    Handler func(*AsciiSource, chan Request, chan *gomemcached.MCResponse,
+    Handler func(*AsciiSource, chan []Request, chan *gomemcached.MCResponse,
 		*AsciiCmd, []string, *bufio.Reader, *bufio.Writer) bool
 }
 
@@ -60,7 +60,7 @@ var asciiCmds = map[string]*AsciiCmd{
 	"quit": &AsciiCmd{
 		gomemcached.QUIT,
 		func(source *AsciiSource,
-			target chan Request, res chan *gomemcached.MCResponse,
+			targetChan chan []Request, res chan *gomemcached.MCResponse,
 			cmd *AsciiCmd, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 			return false
 		},
@@ -68,7 +68,7 @@ var asciiCmds = map[string]*AsciiCmd{
 	"version": &AsciiCmd{
 		gomemcached.VERSION,
 		func(source *AsciiSource,
-			target chan Request, res chan *gomemcached.MCResponse,
+			targetChan chan []Request, res chan *gomemcached.MCResponse,
 			cmd *AsciiCmd, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 			bw.Write([]byte(version))
 			bw.Flush()
@@ -78,7 +78,7 @@ var asciiCmds = map[string]*AsciiCmd{
 	"get": &AsciiCmd{
 		gomemcached.GET,
 		func(source *AsciiSource,
-			target chan Request, res chan *gomemcached.MCResponse,
+			targetChan chan []Request, res chan *gomemcached.MCResponse,
 			cmd *AsciiCmd, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 			if len(req) != 2 {
 				return AsciiClientError(bw, "expected 1 param for get command\r\n")
@@ -87,7 +87,8 @@ var asciiCmds = map[string]*AsciiCmd{
 			if len(key) <= 0 {
 				return AsciiClientError(bw, "missing key\r\n")
 			}
-			target <-Request{
+			reqs := make([]Request, 1)
+			reqs[0] = Request{
 				"default",
 				&gomemcached.MCRequest{
 					Opcode: cmd.Opcode,
@@ -95,6 +96,7 @@ var asciiCmds = map[string]*AsciiCmd{
 				},
 				res,
 			}
+			targetChan <-reqs
 			response := <-res
 			if response.Status == gomemcached.SUCCESS {
 				flg := uint64(binary.BigEndian.Uint32(response.Extras))
@@ -122,7 +124,7 @@ var asciiCmds = map[string]*AsciiCmd{
 }
 
 func AsciiCmdMutation(source *AsciiSource,
-	target chan Request, res chan *gomemcached.MCResponse,
+	targetChan chan []Request, res chan *gomemcached.MCResponse,
 	cmd *AsciiCmd, req []string, br *bufio.Reader, bw *bufio.Writer) bool {
 	if len(req) != 5 {
 		return AsciiClientError(bw, "expected 4 params for set command\r\n")
@@ -162,7 +164,8 @@ func AsciiCmdMutation(source *AsciiSource,
 	binary.BigEndian.PutUint32(extras, uint32(flg))
 	binary.BigEndian.PutUint32(extras[4:], uint32(exp))
 
-	target <-Request{
+	reqs := make([]Request, 1)
+	reqs[0] = Request{
 		"default",
 		&gomemcached.MCRequest{
 			Opcode: cmd.Opcode,
@@ -172,6 +175,7 @@ func AsciiCmdMutation(source *AsciiSource,
 		},
 		res,
 	}
+	targetChan <-reqs
 	response := <-res
 	if response.Status == gomemcached.SUCCESS {
 		bw.Write([]byte("STORED\r\n"))

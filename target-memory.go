@@ -49,17 +49,19 @@ var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
 	},
 }
 
-func MemoryStorageRun(spec string, incoming chan Request) {
+func MemoryStorageRun(spec string, incoming chan []Request) {
 	s := MemoryStorage{data: make(map[string]gomemcached.MCItem)}
 	for {
-		req := <-incoming
-		if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
-			h(&s, req)
-		} else {
-			req.Res <-&gomemcached.MCResponse{
-				Opcode: req.Req.Opcode,
-				Status: gomemcached.UNKNOWN_COMMAND,
-				Opaque: req.Req.Opaque,
+		reqs := <-incoming
+		for _, req := range reqs {
+			if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
+				h(&s, req)
+			} else {
+				req.Res <-&gomemcached.MCResponse{
+					Opcode: req.Req.Opcode,
+					Status: gomemcached.UNKNOWN_COMMAND,
+					Opaque: req.Req.Opaque,
+				}
 			}
 		}
 	}
