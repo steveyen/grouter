@@ -9,6 +9,14 @@ import (
 	"github.com/steveyen/grouter"
 )
 
+type Params struct {
+	sourceSpec string
+	sourceMaxConns int
+
+	targetSpec string
+	targetChanSize int
+}
+
 type EndPoint struct {
 	Usage string
 	Func func(string, int, chan []grouter.Request)
@@ -48,28 +56,27 @@ var Targets = map[string]EndPoint{
 	"memory": EndPoint{"memory", grouter.MemoryStorageRun},
 }
 
-func MainStart(sourceSpec string, sourceMaxConns int,
-	targetSpec string, targetChanSize int) {
+func MainStart(params Params) {
 	log.Printf("grouter")
-	log.Printf("  source: %v", sourceSpec)
-	log.Printf("    sourceMaxConns: %v", sourceMaxConns)
-	log.Printf("  target: %v", targetSpec)
-	log.Printf("    targetChanSize: %v", targetChanSize)
+	log.Printf("  source: %v", params.sourceSpec)
+	log.Printf("    sourceMaxConns: %v", params.sourceMaxConns)
+	log.Printf("  target: %v", params.targetSpec)
+	log.Printf("    targetChanSize: %v", params.targetChanSize)
 
-	sourceKind := strings.Split(sourceSpec, ":")[0]
+	sourceKind := strings.Split(params.sourceSpec, ":")[0]
 	if source, ok := Sources[sourceKind]; ok {
-		targetKind := strings.Split(targetSpec, ":")[0]
+		targetKind := strings.Split(params.targetSpec, ":")[0]
 		if target, ok := Targets[targetKind]; ok {
-			targetChan := make(chan []grouter.Request, targetChanSize)
+			targetChan := make(chan []grouter.Request, params.targetChanSize)
 			go func() {
-				target.Func(targetSpec, targetChanSize, targetChan)
+				target.Func(params.targetSpec, params.targetChanSize, targetChan)
 			}()
-			source.Func(sourceSpec, sourceMaxConns, targetChan)
+			source.Func(params.sourceSpec, params.sourceMaxConns, targetChan)
 		} else {
-			log.Fatalf("error: unknown target kind: %s", targetSpec)
+			log.Fatalf("error: unknown target kind: %s", params.targetSpec)
 		}
 	} else {
-		log.Fatalf("error: unknown source kind: %s", sourceSpec)
+		log.Fatalf("error: unknown source kind: %s", params.sourceSpec)
 	}
 }
 
@@ -89,7 +96,12 @@ func main() {
 		"target chan size to control concurrency")
 
 	flag.Parse()
-	MainStart(*sourceSpec, *sourceMaxConns, *targetSpec, *targetChanSize)
+	MainStart(Params{
+		sourceSpec:     *sourceSpec,
+		sourceMaxConns: *sourceMaxConns,
+		targetSpec:     *targetSpec,
+		targetChanSize: *targetChanSize,
+	})
 }
 
 func EndPointExamples(m map[string]EndPoint) (rv string) {
