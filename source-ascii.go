@@ -37,8 +37,6 @@ func (self AsciiSource) Run(s io.ReadWriter, targetChan chan []Request) {
 			return
 		}
 
-		log.Printf("read: '%s'", buf)
-
 		req := strings.Split(strings.TrimSpace(string(buf)), " ")
 		if asciiCmd, ok := asciiCmds[req[0]]; ok {
 			if !asciiCmd.Handler(&self, targetChan, res, asciiCmd, req, br, bw) {

@@ -83,11 +83,15 @@ func MainStart(params grouter.Params) {
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
 		if target, ok := Targets[targetKind]; ok {
-			targetChan := make(chan []grouter.Request, params.TargetChanSize)
+			unbatched := make(chan []grouter.Request, params.TargetChanSize)
+			batched := make(chan []grouter.Request, params.TargetChanSize)
 			go func() {
-				target.Func(params.TargetSpec, params, targetChan)
+				grouter.BatchRequests(100, unbatched, batched)
 			}()
-			source.Func(params.SourceSpec, params, targetChan)
+			go func() {
+				target.Func(params.TargetSpec, params, batched)
+			}()
+			source.Func(params.SourceSpec, params, unbatched)
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
 		}
