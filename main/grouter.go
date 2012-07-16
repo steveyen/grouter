@@ -8,12 +8,14 @@ import (
 	"github.com/steveyen/grouter"
 )
 
+// Available sources of requests.
 var SourceFuncs = map[string]func(string, int, chan []grouter.Request){
 	"memcached":       grouter.NetListenSourceFunc(&grouter.AsciiSource{}),
 	"memcached-ascii": grouter.NetListenSourceFunc(&grouter.AsciiSource{}),
 	"workload":        grouter.WorkLoad,
 }
 
+// Available targets of requests.
 var TargetFuncs = map[string]func(string, chan []grouter.Request){
 	"http":             grouter.CouchbaseTargetRun,
 	"couchbase":        grouter.CouchbaseTargetRun,
