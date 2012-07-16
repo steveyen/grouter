@@ -14,6 +14,7 @@ import (
 
 var (
 	crnl    = []byte("\r\n")
+	space   = []byte(" ")
 	version = []byte("VERSION grouter 0.0.0\r\n")
 )
 
@@ -100,13 +101,13 @@ var asciiCmds = map[string]*AsciiCmd{
 
 				bw.Write([]byte("VALUE "))
 				bw.Write([]byte(response.Key))
-				bw.Write([]byte(" "))
+				bw.Write(space)
 				bw.Write([]byte(strconv.FormatUint(flg, 10)))
-				bw.Write([]byte(" "))
+				bw.Write(space)
 				bw.Write([]byte(strconv.FormatUint(uint64(len(response.Body)), 10)))
-				bw.Write([]byte("\r\n"))
+				bw.Write(crnl)
 				bw.Write(response.Body)
-				bw.Write([]byte("\r\n"))
+				bw.Write(crnl)
 			}
 			bw.Write([]byte("END\r\n"))
 			bw.Flush()
