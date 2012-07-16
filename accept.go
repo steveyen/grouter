@@ -22,10 +22,16 @@ type Request struct {
 	Bucket string
 	Req *gomemcached.MCRequest
 	Res chan *gomemcached.MCResponse
+
+	// The client number allows backend targets to provide resource
+	// affinity, such as processing requests using the same connection
+	// used for a client's previous requests.  This also ensures
+	// correct semantic ordering from the client's perspective.
+	ClientNum uint32
 }
 
 type Source interface {
-	Run(io.ReadWriter, chan []Request)
+	Run(s io.ReadWriter, clientNum uint32, targetChan chan []Request)
 }
 
 // Returns a source func that net.Listen()'s and accepts conns.
@@ -58,6 +64,7 @@ func AcceptConns(ls net.Listener, maxConns int,
 	chanAccepted := make(chan io.ReadWriteCloser)
 	chanClosed := make(chan io.ReadWriteCloser)
 	numConns := 0
+	totConns := uint32(0)
 
 	go func() {
 		for {
@@ -83,9 +90,10 @@ func AcceptConns(ls net.Listener, maxConns int,
 
 				log.Printf("conn accepted")
 				numConns++
+				totConns++
 
 				go func(s io.ReadWriteCloser) {
-					source.Run(s, targetChan)
+					source.Run(s, totConns, targetChan)
 					chanClosed <-s
 					s.Close()
 				}(c)

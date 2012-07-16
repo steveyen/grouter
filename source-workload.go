@@ -30,6 +30,7 @@ func workLoad(sourceSpec string, sourceMaxConns int, targetChan chan []Request) 
 				Key: []byte("hello"),
 			},
 			res,
+			uint32(sourceMaxConns),
 		}
 		targetChan <-reqs
 		<-res
