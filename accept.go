@@ -124,6 +124,7 @@ func Reconnect(spec string, dialer func(string) (interface{}, error)) interface{
 	return nil // Unreachable.
 }
 
+// Batch up requests from the incoming channel to feed to the outgoing channel.
 func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Request) {
 	batch := make([]Request, 0, maxBatchSize)
 
