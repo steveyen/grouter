@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Provides a capped, exponential-backoff retry loop around a dialer func.
 func Reconnect(spec string, dialer func(string) (interface{}, error)) interface{} {
 	sleep := 100 * time.Millisecond
 	for {
