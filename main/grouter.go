@@ -61,14 +61,17 @@ func main() {
 		"    which should follow a format of KIND[:PARAMS] like..." +
 		EndPointExamples(Targets))
 	targetChanSize := flag.Int("target-chan-size", 5,
-		"target chan size to control concurrency")
+		"target chan size to control queuing")
+	targetConcurrency := flag.Int("target-concurrency", 4,
+		"target concurrency")
 
 	flag.Parse()
 	MainStart(grouter.Params{
-		SourceSpec:     *sourceSpec,
-		SourceMaxConns: *sourceMaxConns,
-		TargetSpec:     *targetSpec,
-		TargetChanSize: *targetChanSize,
+		SourceSpec:        *sourceSpec,
+		SourceMaxConns:    *sourceMaxConns,
+		TargetSpec:        *targetSpec,
+		TargetChanSize:    *targetChanSize,
+		TargetConcurrency: *targetConcurrency,
 	})
 }
 
@@ -78,19 +81,33 @@ func MainStart(params grouter.Params) {
 	log.Printf("    sourceMaxConns: %v", params.SourceMaxConns)
 	log.Printf("  target: %v", params.TargetSpec)
 	log.Printf("    targetChanSize: %v", params.TargetChanSize)
+	log.Printf("    targetConcurrency: %v", params.TargetConcurrency)
 
 	sourceKind := strings.Split(params.SourceSpec, ":")[0]
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
 		if target, ok := Targets[targetKind]; ok {
+			partitions := make([]chan []grouter.Request, params.TargetConcurrency)
+			for i := 0; i < len(partitions); i++ {
+				partitions[i] = make(chan []grouter.Request, params.TargetChanSize)
+
+				func(unbatchedPartition chan[]grouter.Request) {
+					batchedPartition := make(chan []grouter.Request, params.TargetChanSize)
+					go func() {
+						grouter.BatchRequests(params.TargetChanSize,
+							unbatchedPartition, batchedPartition)
+					}()
+					go func() {
+						target.Func(params.TargetSpec, params, batchedPartition)
+					}()
+				}(partitions[i])
+			}
+
 			unbatched := make(chan []grouter.Request, params.TargetChanSize)
-			batched := make(chan []grouter.Request, params.TargetChanSize)
 			go func() {
-				grouter.BatchRequests(100, unbatched, batched)
+				grouter.PartitionRequests(unbatched, partitions)
 			}()
-			go func() {
-				target.Func(params.TargetSpec, params, batched)
-			}()
+
 			source.Func(params.SourceSpec, params, unbatched)
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)

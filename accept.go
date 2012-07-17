@@ -16,6 +16,7 @@ type Params struct {
 
 	TargetSpec string
 	TargetChanSize int
+	TargetConcurrency int
 }
 
 type Request struct {
@@ -153,5 +154,16 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 			reqs := <-incoming
 			batch = append(batch, reqs...)
 		}
+	}
+}
+
+// Partition incoming requests based on client number affinity.
+func PartitionRequests(incoming chan []Request, partitions []chan []Request) {
+	for {
+		reqs := <-incoming
+
+		// TODO: assuming that all reqs in the slice have the same ClientNum.
+		// TODO: one blocked outgoing chan can block all other outgoing chan's.
+		partitions[reqs[0].ClientNum % uint32(len(partitions))] <-reqs
 	}
 }
