@@ -54,7 +54,7 @@ func main() {
 		"source of requests\n" +
 		"    which should follow a format of KIND[:PARAMS] like..." +
 		EndPointExamples(Sources))
-	sourceMaxConns := flag.Int("source-max-conns", 3,
+	sourceMaxConns := flag.Int("source-max-conns", 500,
 		"max conns allowed from source")
 
 	targetSpec := flag.String("target", "memory",
@@ -91,9 +91,9 @@ func MainStart(params grouter.Params) {
 			unbatched := make(chan []grouter.Request, params.TargetChanSize)
 
 			targetConcurrency := params.TargetConcurrency
-			if target.MaxConcurrency > 0 && target.MaxConcurrency > targetConcurrency {
+			if target.MaxConcurrency > 0 && target.MaxConcurrency < targetConcurrency {
 				targetConcurrency = target.MaxConcurrency
-				log.Printf("    targetConcurrency clipped to: %v", targetConcurrency)
+				log.Printf("    target-concurrency clipped to: %v", targetConcurrency)
 			}
 
 			if targetConcurrency > 1 {
