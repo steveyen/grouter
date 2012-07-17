@@ -12,40 +12,41 @@ import (
 type EndPoint struct {
 	Usage string
 	Func func(string, grouter.Params, chan []grouter.Request)
+	MaxConcurrency int
 }
 
 // Available sources of requests.
 var Sources = map[string]EndPoint{
 	"memcached": EndPoint{
 		"memcached:LISTEN_INTERFACE:LISTEN_PORT",
-		grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
+		grouter.MakeListenSourceFunc(&grouter.AsciiSource{}), 0,
 	},
 	"memcached-ascii": EndPoint{
 		"memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT",
-		grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
+		grouter.MakeListenSourceFunc(&grouter.AsciiSource{}), 0,
 	},
-	"workload": EndPoint{"workload", grouter.WorkLoad},
+	"workload": EndPoint{"workload", grouter.WorkLoad, 0},
 }
 
 // Available targets of requests.
 var Targets = map[string]EndPoint{
 	"http": EndPoint{
 		"http:\\\\COUCHBASE_HOST:COUCHBASE_PORT",
-        grouter.CouchbaseTargetRun,
+        grouter.CouchbaseTargetRun, 0,
 	},
 	"couchbase": EndPoint{
 		"couchbase:\\\\COUCHBASE_HOST:COUCHBASE_PORT",
-        grouter.CouchbaseTargetRun,
+        grouter.CouchbaseTargetRun, 0,
 	},
 	"memcached-ascii": EndPoint{
 		"memcached-ascii:HOST:PORT",
-		grouter.MemcachedAsciiTargetRun,
+		grouter.MemcachedAsciiTargetRun, 0,
 	},
 	"memcached-binary": EndPoint{
 		"memcached-binary:HOST:PORT",
-		grouter.MemcachedBinaryTargetRun,
+		grouter.MemcachedBinaryTargetRun, 0,
 	},
-	"memory": EndPoint{"memory", grouter.MemoryStorageRun},
+	"memory": EndPoint{"memory", grouter.MemoryStorageRun, 1},
 }
 
 func main() {
@@ -78,35 +79,35 @@ func main() {
 func MainStart(params grouter.Params) {
 	log.Printf("grouter")
 	log.Printf("  source: %v", params.SourceSpec)
-	log.Printf("    sourceMaxConns: %v", params.SourceMaxConns)
+	log.Printf("    source-max-conns: %v", params.SourceMaxConns)
 	log.Printf("  target: %v", params.TargetSpec)
-	log.Printf("    targetChanSize: %v", params.TargetChanSize)
-	log.Printf("    targetConcurrency: %v", params.TargetConcurrency)
+	log.Printf("    target-chan-size: %v", params.TargetChanSize)
+	log.Printf("    target-concurrency: %v", params.TargetConcurrency)
 
 	sourceKind := strings.Split(params.SourceSpec, ":")[0]
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
 		if target, ok := Targets[targetKind]; ok {
-			partitions := make([]chan []grouter.Request, params.TargetConcurrency)
-			for i := 0; i < len(partitions); i++ {
-				partitions[i] = make(chan []grouter.Request, params.TargetChanSize)
+			unbatched := make(chan []grouter.Request, params.TargetChanSize)
 
-				func(unbatchedPartition chan[]grouter.Request) {
-					batchedPartition := make(chan []grouter.Request, params.TargetChanSize)
-					go func() {
-						grouter.BatchRequests(params.TargetChanSize,
-							unbatchedPartition, batchedPartition)
-					}()
-					go func() {
-						target.Func(params.TargetSpec, params, batchedPartition)
-					}()
-				}(partitions[i])
+			targetConcurrency := params.TargetConcurrency
+			if target.MaxConcurrency > 0 && target.MaxConcurrency > targetConcurrency {
+				targetConcurrency = target.MaxConcurrency
+				log.Printf("    targetConcurrency clipped to: %v", targetConcurrency)
 			}
 
-			unbatched := make(chan []grouter.Request, params.TargetChanSize)
-			go func() {
-				grouter.PartitionRequests(unbatched, partitions)
-			}()
+			if targetConcurrency > 1 {
+				unbatchedLanes := make([]chan []grouter.Request, targetConcurrency)
+				for i := 0; i < len(unbatchedLanes); i++ {
+					unbatchedLanes[i] = make(chan []grouter.Request, params.TargetChanSize)
+					StartTarget(target, unbatchedLanes[i], params)
+				}
+				go func() {
+					grouter.PartitionRequests(unbatched, unbatchedLanes)
+				}()
+			} else {
+				StartTarget(target, unbatched, params)
+			}
 
 			source.Func(params.SourceSpec, params, unbatched)
 		} else {
@@ -115,6 +116,17 @@ func MainStart(params grouter.Params) {
 	} else {
 		log.Fatalf("error: unknown source kind: %s", params.SourceSpec)
 	}
+}
+
+func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
+	params grouter.Params) {
+	batched := make(chan []grouter.Request, params.TargetChanSize)
+	go func() {
+		grouter.BatchRequests(params.TargetChanSize, unbatched, batched)
+	}()
+	go func() {
+		target.Func(params.TargetSpec, params, batched)
+	}()
 }
 
 func EndPointExamples(m map[string]EndPoint) (rv string) {
