@@ -13,7 +13,7 @@ func WorkLoad(sourceSpec string, params Params, targetChan chan []Request) {
 
 func workLoad(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
 	if sourceMaxConns > 1 {
-		go workLoad(sourceSpec, sourceMaxConns - 1, targetChan)
+		go workLoad(sourceSpec, sourceMaxConns-1, targetChan)
 	}
 
 	start := time.Now()
@@ -22,26 +22,24 @@ func workLoad(sourceSpec string, sourceMaxConns int, targetChan chan []Request) 
 	i := 0
 	res := make(chan *gomemcached.MCResponse)
 	for {
-		reqs := make([]Request, 1)
-		reqs[0] = Request{
+		reqs := []Request{{
 			"default",
 			&gomemcached.MCRequest{
 				Opcode: gomemcached.GET,
-				Key: []byte("hello"),
+				Key:    []byte("hello"),
 			},
 			res,
 			uint32(sourceMaxConns),
-		}
-		targetChan <-reqs
+		}}
+		targetChan <- reqs
 		<-res
 		i++
 
-		if i % report == 0 {
+		if i%report == 0 {
 			now := time.Now()
 			dur := now.Sub(start)
-			log.Printf("ops/sec: %f", float64(report) / dur.Seconds())
+			log.Printf("ops/sec: %f", float64(report)/dur.Seconds())
 			start = now
 		}
 	}
 }
-

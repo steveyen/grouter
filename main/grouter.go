@@ -31,11 +31,11 @@ var Sources = map[string]EndPoint{
 // Available targets of requests.
 var Targets = map[string]EndPoint{
 	"http": EndPoint{
-		"http:\\\\COUCHBASE_HOST:COUCHBASE_PORT",
+		"http://COUCHBASE_HOST:COUCHBASE_PORT",
         grouter.CouchbaseTargetRun, 0,
 	},
 	"couchbase": EndPoint{
-		"couchbase:\\\\COUCHBASE_HOST:COUCHBASE_PORT",
+		"couchbase://COUCHBASE_HOST:COUCHBASE_PORT",
         grouter.CouchbaseTargetRun, 0,
 	},
 	"memcached-ascii": EndPoint{
@@ -98,13 +98,11 @@ func MainStart(params grouter.Params) {
 
 			if targetConcurrency > 1 {
 				unbatchedLanes := make([]chan []grouter.Request, targetConcurrency)
-				for i := 0; i < len(unbatchedLanes); i++ {
+				for i := range(unbatchedLanes) {
 					unbatchedLanes[i] = make(chan []grouter.Request, params.TargetChanSize)
 					StartTarget(target, unbatchedLanes[i], params)
 				}
-				go func() {
-					grouter.PartitionRequests(unbatched, unbatchedLanes)
-				}()
+				go grouter.PartitionRequests(unbatched, unbatchedLanes)
 			} else {
 				StartTarget(target, unbatched, params)
 			}

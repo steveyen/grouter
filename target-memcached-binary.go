@@ -23,7 +23,7 @@ func MemcachedBinaryTargetRun(spec string, params Params, incoming chan []Reques
 			res, err := client.Send(req.Req)
 			log.Printf("sending.done: %s; err: %v", spec, err)
 			if err != nil {
-				req.Res <-&gomemcached.MCResponse{
+				req.Res <- &gomemcached.MCResponse{
 					Opcode: req.Req.Opcode,
 					Status: gomemcached.EINVAL,
 					Opaque: req.Req.Opaque,
@@ -35,9 +35,8 @@ func MemcachedBinaryTargetRun(spec string, params Params, incoming chan []Reques
 					return memcached.Connect("tcp", spec)
 				}).(*memcached.Client)
 			} else {
-				req.Res <-res
+				req.Res <- res
 			}
 		}
 	}
 }
-

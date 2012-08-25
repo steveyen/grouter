@@ -191,8 +191,7 @@ func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request
 	br := bufio.NewReader(conn)
 	bw := bufio.NewWriter(conn)
 
-	for {
-		reqs := <-incoming
+	for reqs := range incoming {
 		for _, req := range reqs {
 			if h, ok := MemcachedAsciiTargetHandlers[req.Req.Opcode]; ok {
 				err := h(br, bw, req)

@@ -11,18 +11,18 @@ import (
 )
 
 type Params struct {
-	SourceSpec string
+	SourceSpec     string
 	SourceMaxConns int
 
-	TargetSpec string
-	TargetChanSize int
+	TargetSpec        string
+	TargetChanSize    int
 	TargetConcurrency int
 }
 
 type Request struct {
 	Bucket string
-	Req *gomemcached.MCRequest
-	Res chan *gomemcached.MCResponse
+	Req    *gomemcached.MCRequest
+	Res    chan *gomemcached.MCResponse
 
 	// The client number allows backend targets to provide resource
 	// affinity, such as processing requests using the same connection
@@ -36,7 +36,7 @@ type Source interface {
 }
 
 // Returns a source func that net.Listen()'s and accepts conns.
-func MakeListenSourceFunc(source Source)func(string, Params, chan []Request) {
+func MakeListenSourceFunc(source Source) func(string, Params, chan []Request) {
 	return func(sourceSpec string, params Params, targetChan chan []Request) {
 		sourceParts := strings.Split(sourceSpec, ":")
 		if len(sourceParts) == 3 {
@@ -75,7 +75,7 @@ func AcceptConns(ls net.Listener, maxConns int,
 				close(chanAccepted)
 				return
 			}
-			chanAccepted <-c
+			chanAccepted <- c
 		}
 	}()
 
@@ -95,7 +95,7 @@ func AcceptConns(ls net.Listener, maxConns int,
 
 				go func(s io.ReadWriteCloser) {
 					source.Run(s, totConns, targetChan)
-					chanClosed <-s
+					chanClosed <- s
 					s.Close()
 				}(c)
 			case <-chanClosed:
@@ -117,12 +117,12 @@ func Reconnect(spec string, dialer func(string) (interface{}, error)) interface{
 	for {
 		client, err := dialer(spec)
 		if err != nil {
-			if sleep > 2000 * time.Millisecond {
+			if sleep > 2000*time.Millisecond {
 				sleep = 2000 * time.Millisecond
 			}
-			log.Printf("warn: reconnect failed: %s;" +
+			log.Printf("warn: reconnect failed: %s;"+
 				" sleeping (ms): %d; err: %v",
-				spec, sleep / time.Millisecond, err)
+				spec, sleep/time.Millisecond, err)
 			time.Sleep(sleep)
 			sleep = sleep * 2
 		} else {
@@ -140,11 +140,11 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 	for {
 		if len(batch) > 0 {
 			if len(batch) >= cap(batch) {
-				outgoing <-batch
+				outgoing <- batch
 				batch = make([]Request, 0, maxBatchSize)
 			} else {
 				select {
-				case outgoing <-batch:
+				case outgoing <- batch:
 					batch = make([]Request, 0, maxBatchSize)
 				case reqs := <-incoming:
 					batch = append(batch, reqs...)
@@ -159,11 +159,9 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 
 // Partition incoming requests into a lane based on client number affinity.
 func PartitionRequests(incoming chan []Request, lanes []chan []Request) {
-	for {
-		reqs := <-incoming
-
+	for reqs := range incoming {
 		// TODO: assuming that all reqs in the slice have the same ClientNum.
 		// TODO: one blocked lane can block all other lanes.
-		lanes[reqs[0].ClientNum % uint32(len(lanes))] <-reqs
+		lanes[reqs[0].ClientNum%uint32(len(lanes))] <- reqs
 	}
 }
