@@ -157,11 +157,12 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 	}
 }
 
-// Partition incoming requests into a lane based on client number affinity.
+// Read incoming requests and partition (or shard) those requests into
+// one of many output lanes based on client number affinity.
 func PartitionRequests(incoming chan []Request, lanes []chan []Request) {
 	for reqs := range incoming {
-		// TODO: assuming that all reqs in the slice have the same ClientNum.
-		// TODO: one blocked lane can block all other lanes.
+		// TODO: assuming that all incoming reqs have the same ClientNum.
+		// TODO: one blocked output lane can block all other output lanes.
 		lanes[reqs[0].ClientNum%uint32(len(lanes))] <- reqs
 	}
 }
