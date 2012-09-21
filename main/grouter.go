@@ -51,16 +51,16 @@ var Targets = map[string]EndPoint{
 
 func main() {
 	sourceSpec := flag.String("source", "memcached-ascii::11300",
-		"source of requests\n" +
-		"    which should follow a format of KIND[:PARAMS] like..." +
-		EndPointExamples(Sources))
+        "source of requests\n" +
+        "    as SOURCE_KIND[:MORE_PARAMS]\n" +
+        "    examples..." + EndPointExamples(Sources))
 	sourceMaxConns := flag.Int("source-max-conns", 500,
 		"max conns allowed from source")
 
 	targetSpec := flag.String("target", "memory",
-		"target of requests\n" +
-		"    which should follow a format of KIND[:PARAMS] like..." +
-		EndPointExamples(Targets))
+        "target of requests\n" +
+        "    as TARGET_KIND[:MORE_PARAMS]\n" +
+        "    examples..." + EndPointExamples(Targets))
 	targetChanSize := flag.Int("target-chan-size", 5,
 		"target chan size to control queuing")
 	targetConcurrency := flag.Int("target-concurrency", 4,
