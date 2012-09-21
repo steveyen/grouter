@@ -95,7 +95,9 @@ func MainStart(params grouter.Params) {
 			if (target.MaxConcurrency > 0 &&
 				target.MaxConcurrency < targetConcurrency) {
 				targetConcurrency = target.MaxConcurrency
-				log.Printf("    target-concurrency clipped to: %v", targetConcurrency)
+				log.Printf("    target-concurrency clipped to: %v;" +
+					" due to limitations of target kind: %v",
+					targetConcurrency, targetKind)
 			}
 
 			if targetConcurrency > 1 {
