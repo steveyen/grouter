@@ -22,9 +22,7 @@ Or, old-school...
     cd ~/go/src/github.com/steveyen
     git clone git://github.com/steveyen/grouter.git
 
-Or, just use 'go get github.com/steveyen/grouter'.
-
-For develoeprs, to (re-)build it...
+For developers, to (re-)build it...
 
     cd grouter
     go build ./main/grouter.go
