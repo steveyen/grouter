@@ -100,16 +100,12 @@ func MainStart(params grouter.Params) {
 					targetConcurrency, targetKind)
 			}
 
-			if targetConcurrency > 1 {
-				unbatchedLanes := make([]chan []grouter.Request, targetConcurrency)
-				for i := range(unbatchedLanes) {
-					unbatchedLanes[i] = make(chan []grouter.Request, params.TargetChanSize)
-					StartTarget(target, unbatchedLanes[i], params)
-				}
-				go grouter.PartitionRequests(unbatched, unbatchedLanes)
-			} else {
-				StartTarget(target, unbatched, params)
+			unbatchedLanes := make([]chan []grouter.Request, targetConcurrency)
+			for i := range(unbatchedLanes) {
+				unbatchedLanes[i] = make(chan []grouter.Request, params.TargetChanSize)
+				StartTarget(target, unbatchedLanes[i], params)
 			}
+			go grouter.PartitionRequests(unbatched, unbatchedLanes)
 
 			source.Entry(params.SourceSpec, params, unbatched)
 		} else {
