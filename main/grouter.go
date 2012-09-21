@@ -10,9 +10,9 @@ import (
 )
 
 type EndPoint struct {
-	Usage string
+	Usage string // Help string.
 	Entry func(string, grouter.Params, chan []grouter.Request)
-	MaxConcurrency int
+	MaxConcurrency int // Some end-points have limited concurrency.
 }
 
 // Available sources of requests.
@@ -64,7 +64,7 @@ func main() {
 	targetChanSize := flag.Int("target-chan-size", 5,
 		"target chan size to control queuing")
 	targetConcurrency := flag.Int("target-concurrency", 4,
-		"target concurrency")
+		"# of concurrent workers in front of target")
 
 	flag.Parse()
 	MainStart(grouter.Params{
@@ -88,10 +88,12 @@ func MainStart(params grouter.Params) {
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
 		if target, ok := Targets[targetKind]; ok {
+			// Sources send requests to an unbatched channel.
 			unbatched := make(chan []grouter.Request, params.TargetChanSize)
 
 			targetConcurrency := params.TargetConcurrency
-			if target.MaxConcurrency > 0 && target.MaxConcurrency < targetConcurrency {
+			if (target.MaxConcurrency > 0 &&
+				target.MaxConcurrency < targetConcurrency) {
 				targetConcurrency = target.MaxConcurrency
 				log.Printf("    target-concurrency clipped to: %v", targetConcurrency)
 			}
