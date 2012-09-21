@@ -11,7 +11,7 @@ import (
 
 type EndPoint struct {
 	Usage string
-	Func func(string, grouter.Params, chan []grouter.Request)
+	Entry func(string, grouter.Params, chan []grouter.Request)
 	MaxConcurrency int
 }
 
@@ -107,7 +107,7 @@ func MainStart(params grouter.Params) {
 				StartTarget(target, unbatched, params)
 			}
 
-			source.Func(params.SourceSpec, params, unbatched)
+			source.Entry(params.SourceSpec, params, unbatched)
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
 		}
@@ -123,7 +123,7 @@ func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
 		grouter.BatchRequests(params.TargetChanSize, unbatched, batched)
 	}()
 	go func() {
-		target.Func(params.TargetSpec, params, batched)
+		target.Entry(params.TargetSpec, params, batched)
 	}()
 }
 
