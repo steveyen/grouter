@@ -18,7 +18,7 @@ var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
 		ret := &gomemcached.MCResponse{
 			Opcode: req.Req.Opcode,
 			Opaque: req.Req.Opaque,
-			Key: req.Req.Key,
+			Key:    req.Req.Key,
 		}
 		if item, ok := s.data[string(req.Req.Key)]; ok {
 			ret.Status = gomemcached.SUCCESS
@@ -34,17 +34,17 @@ var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
 	gomemcached.SET: func(s *MemoryStorage, req Request) {
 		s.cas += 1
 		s.data[string(req.Req.Key)] = gomemcached.MCItem{
-			Flags: binary.BigEndian.Uint32(req.Req.Extras),
+			Flags:      binary.BigEndian.Uint32(req.Req.Extras),
 			Expiration: binary.BigEndian.Uint32(req.Req.Extras[4:]),
-			Cas: s.cas,
-			Data: req.Req.Body,
+			Cas:        s.cas,
+			Data:       req.Req.Body,
 		}
 		req.Res <- &gomemcached.MCResponse{
 			Opcode: req.Req.Opcode,
 			Status: gomemcached.SUCCESS,
 			Opaque: req.Req.Opaque,
-			Cas: s.cas,
-			Key: req.Req.Key,
+			Cas:    s.cas,
+			Key:    req.Req.Key,
 		}
 	},
 }
@@ -57,7 +57,7 @@ func MemoryStorageRun(spec string, params Params, incoming chan []Request) {
 			if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
 				h(&s, req)
 			} else {
-				req.Res <-&gomemcached.MCResponse{
+				req.Res <- &gomemcached.MCResponse{
 					Opcode: req.Req.Opcode,
 					Status: gomemcached.UNKNOWN_COMMAND,
 					Opaque: req.Req.Opaque,
@@ -66,4 +66,3 @@ func MemoryStorageRun(spec string, params Params, incoming chan []Request) {
 		}
 	}
 }
-

@@ -1,9 +1,9 @@
 package grouter
 
 import (
-	"encoding/binary"
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -15,12 +15,12 @@ import (
 )
 
 var (
-	prefix_get = []byte("get ")
-	prefix_set = []byte("set ")
-	prefix_add = []byte("add ")
+	prefix_get     = []byte("get ")
+	prefix_set     = []byte("set ")
+	prefix_add     = []byte("add ")
 	prefix_replace = []byte("replace ")
 	prefix_prepend = []byte("prepend ")
-	prefix_append = []byte("append ")
+	prefix_append  = []byte("append ")
 )
 
 type MemcachedAsciiTargetHandler func(*bufio.Reader, *bufio.Writer, Request) error
@@ -38,19 +38,19 @@ var MemcachedAsciiTargetHandlers = map[gomemcached.CommandCode]MemcachedAsciiTar
 		}
 		if endParts[0] == "END" {
 			if numValues <= 0 {
-				req.Res <-&gomemcached.MCResponse{
+				req.Res <- &gomemcached.MCResponse{
 					Opcode: req.Req.Opcode,
 					Status: gomemcached.KEY_ENOENT,
 					Opaque: req.Req.Opaque,
-					Key: req.Req.Key,
+					Key:    req.Req.Key,
 				}
 			}
 		} else {
-			req.Res <-&gomemcached.MCResponse{
+			req.Res <- &gomemcached.MCResponse{
 				Opcode: req.Req.Opcode,
 				Status: gomemcached.EINVAL,
 				Opaque: req.Req.Opaque,
-				Key: req.Req.Key,
+				Key:    req.Req.Key,
 			}
 		}
 		return nil
@@ -98,25 +98,25 @@ func AsciiTargetMutation(br *bufio.Reader, bw *bufio.Writer,
 		return fmt.Errorf("error: line is too long")
 	}
 	if string(line) == "STORED" {
-		req.Res <-&gomemcached.MCResponse{
+		req.Res <- &gomemcached.MCResponse{
 			Opcode: req.Req.Opcode,
 			Status: gomemcached.SUCCESS,
 			Opaque: req.Req.Opaque,
-			Key: req.Req.Key,
+			Key:    req.Req.Key,
 		}
 	} else if string(line) == "NOT_STORED" {
-		req.Res <-&gomemcached.MCResponse{
+		req.Res <- &gomemcached.MCResponse{
 			Opcode: req.Req.Opcode,
 			Status: gomemcached.NOT_STORED,
 			Opaque: req.Req.Opaque,
-			Key: req.Req.Key,
+			Key:    req.Req.Key,
 		}
 	} else {
-		req.Res <-&gomemcached.MCResponse{
+		req.Res <- &gomemcached.MCResponse{
 			Opcode: req.Req.Opcode,
 			Status: gomemcached.EINVAL,
 			Opaque: req.Req.Opaque,
-			Key: req.Req.Key,
+			Key:    req.Req.Key,
 		}
 	}
 	return nil
@@ -146,16 +146,16 @@ func AsciiTargetReadLines(br *bufio.Reader, req Request) (int, []string, error) 
 				return numValues, parts, err
 			}
 
-			buf := make([]byte, nval + 2)
+			buf := make([]byte, nval+2)
 			nbuf, err := io.ReadFull(br, buf)
 			if err != nil {
 				return numValues, parts, err
 			}
-			if nbuf != nval + 2 {
-				err = fmt.Errorf("error: nbuf mismatch: %d != %d", nbuf, nval + 2)
+			if nbuf != nval+2 {
+				err = fmt.Errorf("error: nbuf mismatch: %d != %d", nbuf, nval+2)
 				return numValues, parts, err
 			}
-			if !bytes.Equal(buf[nbuf - 2:], crnl) {
+			if !bytes.Equal(buf[nbuf-2:], crnl) {
 				err = fmt.Errorf("error: was expecting crlf")
 				return numValues, parts, err
 			}
@@ -163,13 +163,13 @@ func AsciiTargetReadLines(br *bufio.Reader, req Request) (int, []string, error) 
 			extras := make([]byte, 4)
 			binary.BigEndian.PutUint32(extras, uint32(flg))
 
-			req.Res <-&gomemcached.MCResponse{
+			req.Res <- &gomemcached.MCResponse{
 				Opcode: req.Req.Opcode,
 				Status: gomemcached.SUCCESS,
 				Opaque: req.Req.Opaque,
 				Extras: extras,
-				Key: []byte(parts[1]),
-				Body: buf[:nval],
+				Key:    []byte(parts[1]),
+				Body:   buf[:nval],
 			}
 
 			numValues++
@@ -196,8 +196,8 @@ func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request
 			if h, ok := MemcachedAsciiTargetHandlers[req.Req.Opcode]; ok {
 				err := h(br, bw, req)
 				if err != nil {
-					req.Res <-&gomemcached.MCResponse{
-					Opcode: req.Req.Opcode,
+					req.Res <- &gomemcached.MCResponse{
+						Opcode: req.Req.Opcode,
 						Status: gomemcached.EINVAL,
 						Opaque: req.Req.Opaque,
 					}
@@ -211,7 +211,7 @@ func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request
 					bw = bufio.NewWriter(conn)
 				}
 			} else {
-				req.Res <-&gomemcached.MCResponse{
+				req.Res <- &gomemcached.MCResponse{
 					Opcode: req.Req.Opcode,
 					Status: gomemcached.UNKNOWN_COMMAND,
 					Opaque: req.Req.Opaque,
@@ -220,4 +220,3 @@ func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request
 		}
 	}
 }
-

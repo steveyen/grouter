@@ -44,14 +44,14 @@ func (self AsciiSource) Run(s io.ReadWriter,
 				return
 			}
 		} else {
-			AsciiClientError(bw, "unknown command - " + req[0] + "\r\n")
+			AsciiClientError(bw, "unknown command - "+req[0]+"\r\n")
 		}
 	}
 }
 
 type AsciiCmd struct {
-	Opcode gomemcached.CommandCode
-    Handler func(source *AsciiSource,
+	Opcode  gomemcached.CommandCode
+	Handler func(source *AsciiSource,
 		targetChan chan []Request, res chan *gomemcached.MCResponse,
 		cmd *AsciiCmd, req []string, br *bufio.Reader, bw *bufio.Writer,
 		clientNum uint32) bool
@@ -96,12 +96,12 @@ var asciiCmds = map[string]*AsciiCmd{
 				"default",
 				&gomemcached.MCRequest{
 					Opcode: cmd.Opcode,
-					Key: []byte(key),
+					Key:    []byte(key),
 				},
 				res,
 				clientNum,
 			}
-			targetChan <-reqs
+			targetChan <- reqs
 			response := <-res
 			if response.Status == gomemcached.SUCCESS {
 				flg := uint64(binary.BigEndian.Uint32(response.Extras))
@@ -121,11 +121,11 @@ var asciiCmds = map[string]*AsciiCmd{
 			return true
 		},
 	},
-	"set":     &AsciiCmd{gomemcached.SET,     AsciiCmdMutation},
-	"add":     &AsciiCmd{gomemcached.ADD,     AsciiCmdMutation},
+	"set":     &AsciiCmd{gomemcached.SET, AsciiCmdMutation},
+	"add":     &AsciiCmd{gomemcached.ADD, AsciiCmdMutation},
 	"replace": &AsciiCmd{gomemcached.REPLACE, AsciiCmdMutation},
 	"prepend": &AsciiCmd{gomemcached.PREPEND, AsciiCmdMutation},
-	"append":  &AsciiCmd{gomemcached.APPEND,  AsciiCmdMutation},
+	"append":  &AsciiCmd{gomemcached.APPEND, AsciiCmdMutation},
 }
 
 func AsciiCmdMutation(source *AsciiSource,
@@ -151,17 +151,17 @@ func AsciiCmdMutation(source *AsciiSource,
 	if e != nil || nval < 0 {
 		return AsciiClientError(bw, "could not parse value length\r\n")
 	}
-	buf := make([]byte, nval + 2)
+	buf := make([]byte, nval+2)
 	nbuf, e := io.ReadFull(br, buf)
 	if e != nil {
 		log.Printf("AsciiSource error: %s", e)
 		return false
 	}
-	if nbuf != nval + 2 {
+	if nbuf != nval+2 {
 		log.Printf("AsciiSource nbuf error: %s", e)
 		return false
 	}
-	if !bytes.Equal(buf[nbuf - 2:], crnl) {
+	if !bytes.Equal(buf[nbuf-2:], crnl) {
 		return AsciiClientError(bw, "was expecting CRNL value termination\r\n")
 	}
 	val := buf[:nval]
@@ -175,14 +175,14 @@ func AsciiCmdMutation(source *AsciiSource,
 		"default",
 		&gomemcached.MCRequest{
 			Opcode: cmd.Opcode,
-			Key: []byte(key),
+			Key:    []byte(key),
 			Extras: extras,
-			Body: val,
+			Body:   val,
 		},
 		res,
 		clientNum,
 	}
-	targetChan <-reqs
+	targetChan <- reqs
 	response := <-res
 	if response.Status == gomemcached.SUCCESS {
 		bw.Write([]byte("STORED\r\n"))
@@ -200,4 +200,3 @@ func AsciiClientError(bw *bufio.Writer, msg string) bool {
 	bw.Flush()
 	return true
 }
-
