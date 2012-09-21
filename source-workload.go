@@ -8,12 +8,12 @@ import (
 )
 
 func WorkLoad(sourceSpec string, params Params, targetChan chan []Request) {
-	workLoad(sourceSpec, params.SourceMaxConns, targetChan)
+	run(sourceSpec, params.SourceMaxConns, targetChan)
 }
 
-func workLoad(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
+func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
 	if sourceMaxConns > 1 {
-		go workLoad(sourceSpec, sourceMaxConns-1, targetChan)
+		go run(sourceSpec, sourceMaxConns-1, targetChan)
 	}
 
 	start := time.Now()
