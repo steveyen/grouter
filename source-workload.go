@@ -7,7 +7,7 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-const MAX_CONNS = 10
+const MAX_CONNS = 4
 
 func WorkLoad(sourceSpec string, params Params, targetChan chan []Request) {
 	run(sourceSpec, params.SourceMaxConns, targetChan)
