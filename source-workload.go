@@ -17,28 +17,32 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
 	}
 
 	start := time.Now()
-	report := 100000
-
-	i := 0
+	report_every := 100000
+	ops_per_round := 100
+	ops := 0
 	res := make(chan *gomemcached.MCResponse)
 	for {
-		reqs := []Request{{
-			"default",
-			&gomemcached.MCRequest{
-				Opcode: gomemcached.GET,
-				Key:    []byte("hello"),
-			},
-			res,
-			uint32(sourceMaxConns),
-		}}
+		reqs := make([]Request, ops_per_round)
+		for i := range(reqs) {
+			reqs[i] = Request{"default",
+				&gomemcached.MCRequest{
+					Opcode: gomemcached.GET,
+					Key:    []byte("hello"),
+				},
+				res,
+				uint32(sourceMaxConns),
+			}
+		}
 		targetChan <- reqs
-		<-res
-		i++
+		for _ = range(reqs) {
+			<-res
+			ops++
+		}
 
-		if i%report == 0 {
+		if ops%report_every == 0 {
 			now := time.Now()
 			dur := now.Sub(start)
-			log.Printf("ops/sec: %f", float64(report)/dur.Seconds())
+			log.Printf("ops/sec: %f", float64(report_every)/dur.Seconds())
 			start = now
 		}
 	}
