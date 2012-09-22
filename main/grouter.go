@@ -11,7 +11,7 @@ import (
 
 type EndPoint struct {
 	Usage string // Help string.
-	Entry func(string, grouter.Params, chan []grouter.Request)
+	Start func(string, grouter.Params, chan []grouter.Request)
 	MaxConcurrency int // Some end-points have limited concurrency.
 }
 
@@ -91,7 +91,7 @@ func MainStart(params grouter.Params) {
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
 		if target, ok := Targets[targetKind]; ok {
-			// Sources send requests to an unbatched channel.
+			// The source will send requests to a shared, unbatched channel.
 			unbatched := make(chan []grouter.Request, params.TargetChanSize)
 
 			targetConcurrency := params.TargetConcurrency
@@ -103,14 +103,18 @@ func MainStart(params grouter.Params) {
 					targetConcurrency, targetKind)
 			}
 
-			unbatchedLanes := make([]chan []grouter.Request, targetConcurrency)
-			for i := range(unbatchedLanes) {
-				unbatchedLanes[i] = make(chan []grouter.Request, params.TargetChanSize)
-				StartTarget(target, unbatchedLanes[i], params)
+			// Requests coming into the shared, unbatched channel are
+			// partitioned, into concurrent "lanes", where target
+			// goroutines are assigned to each own its own lane (channel).
+			lanes := make([]chan []grouter.Request, targetConcurrency)
+			for i := range(lanes) {
+				lanes[i] = make(chan []grouter.Request, params.TargetChanSize)
+				StartTarget(target, lanes[i], params)
 			}
-			go grouter.PartitionRequests(unbatched, unbatchedLanes)
+			go grouter.PartitionRequests(unbatched, lanes)
 
-			source.Entry(params.SourceSpec, params, unbatched)
+			// Start the source after all the lanes and channels are setup.
+			source.Start(params.SourceSpec, params, unbatched)
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
 		}
@@ -126,7 +130,7 @@ func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
 		grouter.BatchRequests(params.TargetChanSize, unbatched, batched)
 	}()
 	go func() {
-		target.Entry(params.TargetSpec, params, batched)
+		target.Start(params.TargetSpec, params, batched)
 	}()
 }
 
