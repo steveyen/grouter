@@ -31,13 +31,19 @@ type Request struct {
 	ClientNum uint32
 }
 
+type Stats struct {
+	keys []string
+	vals []int
+}
+
 type Source interface {
-	Run(s io.ReadWriter, clientNum uint32, targetChan chan []Request)
+	Run(s io.ReadWriter, clientNum uint32, targetChan chan []Request,
+		statsChan chan Stats)
 }
 
 // Returns a source func that net.Listen()'s and accepts conns.
-func MakeListenSourceFunc(source Source) func(string, Params, chan []Request) {
-	return func(sourceSpec string, params Params, targetChan chan []Request) {
+func MakeListenSourceFunc(source Source) func(string, Params, chan []Request, chan Stats) {
+	return func(sourceSpec string, params Params, targetChan chan []Request, statsChan chan Stats) {
 		sourceParts := strings.Split(sourceSpec, ":")
 		if len(sourceParts) == 3 {
 			listen := strings.Join(sourceParts[1:], ":")
@@ -47,7 +53,7 @@ func MakeListenSourceFunc(source Source) func(string, Params, chan []Request) {
 			} else {
 				defer ls.Close()
 				log.Printf("listening to: %s", listen)
-				AcceptConns(ls, params.SourceMaxConns, source, targetChan)
+				AcceptConns(ls, params.SourceMaxConns, source, targetChan, statsChan)
 			}
 		} else {
 			log.Fatalf("error: missing listen HOST:PORT; instead, got: %v",
@@ -59,7 +65,7 @@ func MakeListenSourceFunc(source Source) func(string, Params, chan []Request) {
 // Accepts a max number of concurrent net.Conn's, starting a new
 // goroutine for each accepted net.Conn.
 func AcceptConns(ls net.Listener, maxConns int,
-	source Source, targetChan chan []Request) {
+	source Source, targetChan chan []Request, statsChan chan Stats) {
 	log.Printf("accepting max conns: %d", maxConns)
 
 	chanAccepted := make(chan io.ReadWriteCloser)
@@ -94,7 +100,7 @@ func AcceptConns(ls net.Listener, maxConns int,
 				totConns++
 
 				go func(s io.ReadWriteCloser) {
-					source.Run(s, totConns, targetChan)
+					source.Run(s, totConns, targetChan, statsChan)
 					chanClosed <- s
 					s.Close()
 				}(c)

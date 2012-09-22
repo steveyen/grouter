@@ -11,7 +11,7 @@ import (
 
 type EndPoint struct {
 	Usage string // Help string.
-	Start func(string, grouter.Params, chan []grouter.Request)
+	Start func(string, grouter.Params, chan []grouter.Request, chan grouter.Stats)
 	MaxConcurrency int // Some end-points have limited concurrency.
 }
 
@@ -87,6 +87,8 @@ func main() {
 }
 
 func MainStart(params grouter.Params) {
+	statsChan := make(chan grouter.Stats)
+
 	sourceKind := strings.Split(params.SourceSpec, ":")[0]
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
@@ -109,12 +111,12 @@ func MainStart(params grouter.Params) {
 			lanes := make([]chan []grouter.Request, targetConcurrency)
 			for i := range(lanes) {
 				lanes[i] = make(chan []grouter.Request, params.TargetChanSize)
-				StartTarget(target, lanes[i], params)
+				StartTarget(target, lanes[i], params, statsChan)
 			}
 			go grouter.PartitionRequests(unbatched, lanes)
 
 			// Start the source after all the lanes and channels are setup.
-			source.Start(params.SourceSpec, params, unbatched)
+			source.Start(params.SourceSpec, params, unbatched, statsChan)
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
 		}
@@ -124,13 +126,13 @@ func MainStart(params grouter.Params) {
 }
 
 func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
-	params grouter.Params) {
+	params grouter.Params, statsChan chan grouter.Stats) {
 	batched := make(chan []grouter.Request, params.TargetChanSize)
 	go func() {
 		grouter.BatchRequests(params.TargetChanSize, unbatched, batched)
 	}()
 	go func() {
-		target.Start(params.TargetSpec, params, batched)
+		target.Start(params.TargetSpec, params, batched, statsChan)
 	}()
 }
 

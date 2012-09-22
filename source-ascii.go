@@ -22,7 +22,7 @@ type AsciiSource struct {
 }
 
 func (self AsciiSource) Run(s io.ReadWriter,
-	clientNum uint32, targetChan chan []Request) {
+	clientNum uint32, targetChan chan []Request, statsChan chan Stats) {
 	br := bufio.NewReader(s)
 	bw := bufio.NewWriter(s)
 	res := make(chan *gomemcached.MCResponse)

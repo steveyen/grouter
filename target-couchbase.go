@@ -22,7 +22,8 @@ var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler
 	},
 }
 
-func CouchbaseTargetRun(spec string, params Params, incoming chan []Request) {
+func CouchbaseTargetRun(spec string, params Params, incoming chan []Request,
+	statsChan chan Stats) {
 	specHTTP := strings.Replace(spec, "couchbase:", "http:", 1)
 
 	client, err := couchbase.Connect(specHTTP)

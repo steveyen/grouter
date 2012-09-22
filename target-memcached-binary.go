@@ -8,7 +8,8 @@ import (
 	"github.com/dustin/gomemcached/client"
 )
 
-func MemcachedBinaryTargetRun(spec string, params Params, incoming chan []Request) {
+func MemcachedBinaryTargetRun(spec string, params Params, incoming chan []Request,
+	statsChan chan Stats) {
 	spec = strings.Replace(spec, "memcached-binary:", "", 1)
 
 	client, err := memcached.Connect("tcp", spec)

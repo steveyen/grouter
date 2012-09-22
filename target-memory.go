@@ -49,7 +49,8 @@ var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
 	},
 }
 
-func MemoryStorageRun(spec string, params Params, incoming chan []Request) {
+func MemoryStorageRun(spec string, params Params, incoming chan []Request,
+	statsChan chan Stats) {
 	s := MemoryStorage{data: make(map[string]gomemcached.MCItem)}
 	for {
 		reqs := <-incoming

@@ -7,13 +7,15 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-func WorkLoad(sourceSpec string, params Params, targetChan chan []Request) {
-	run(sourceSpec, params.SourceMaxConns, targetChan)
+func WorkLoad(sourceSpec string, params Params, targetChan chan []Request,
+	statsChan chan Stats) {
+	run(sourceSpec, params.SourceMaxConns, targetChan, statsChan)
 }
 
-func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
+func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
+	statsChan chan Stats) {
 	if sourceMaxConns > 1 {
-		go run(sourceSpec, sourceMaxConns-1, targetChan)
+		go run(sourceSpec, sourceMaxConns-1, targetChan, statsChan)
 	}
 
 	start := time.Now()
@@ -23,7 +25,7 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
 	res := make(chan *gomemcached.MCResponse)
 	for {
 		reqs := make([]Request, ops_per_round)
-		for i := range(reqs) {
+		for i := range reqs {
 			reqs[i] = Request{"default",
 				&gomemcached.MCRequest{
 					Opcode: gomemcached.GET,
@@ -34,7 +36,7 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request) {
 			}
 		}
 		targetChan <- reqs
-		for _ = range(reqs) {
+		for _ = range reqs {
 			<-res
 			ops++
 		}
