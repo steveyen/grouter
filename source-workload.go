@@ -18,14 +18,14 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 		go run(sourceSpec, sourceMaxConns-1, targetChan, statsChan)
 	}
 
-	start := time.Now()
 	report_every := 100000
 	ops_per_round := 100
-	ops := 0
+	tot_ops_nsecs := int64(0)
+	tot_ops := 0
 	res := make(chan *gomemcached.MCResponse)
 	for {
 		reqs := make([]Request, ops_per_round)
-		for i := range reqs {
+		for i := 0; i < ops_per_round; i++ {
 			reqs[i] = Request{"default",
 				&gomemcached.MCRequest{
 					Opcode: gomemcached.GET,
@@ -35,17 +35,20 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 				uint32(sourceMaxConns),
 			}
 		}
+		reqs_start := time.Now()
 		targetChan <- reqs
-		for _ = range reqs {
+		for i := 0; i < ops_per_round; i++ {
 			<-res
-			ops++
 		}
+		reqs_end := time.Now()
 
-		if ops%report_every == 0 {
-			now := time.Now()
-			dur := now.Sub(start)
-			log.Printf("ops/sec: %f", float64(report_every)/dur.Seconds())
-			start = now
+		tot_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
+		tot_ops += ops_per_round
+		if tot_ops%report_every == 0 {
+			tot_ops_secs := float64(tot_ops_nsecs) / float64(1000000000.0)
+			log.Printf("ops/sec: %f", float64(tot_ops)/tot_ops_secs)
+			tot_ops_nsecs = int64(0)
+			tot_ops = 0
 		}
 	}
 }
