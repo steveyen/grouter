@@ -54,7 +54,7 @@ func main() {
         "source of requests\n" +
         "    as SOURCE_KIND[:MORE_PARAMS]\n" +
         "    examples..." + EndPointExamples(Sources))
-	sourceMaxConns := flag.Int("source-max-conns", 500,
+	sourceMaxConns := flag.Int("source-max-conns", 100,
 		"max conns allowed from source")
 
 	targetSpec := flag.String("target", "memory",
@@ -67,16 +67,15 @@ func main() {
 		"# of concurrent workers in front of target")
 
 	flag.Parse()
-	MainStart(grouter.Params{
+
+	params := grouter.Params{
 		SourceSpec:        *sourceSpec,
 		SourceMaxConns:    *sourceMaxConns,
 		TargetSpec:        *targetSpec,
 		TargetChanSize:    *targetChanSize,
 		TargetConcurrency: *targetConcurrency,
-	})
-}
+	}
 
-func MainStart(params grouter.Params) {
 	log.Printf("grouter")
 	log.Printf("  source: %v", params.SourceSpec)
 	log.Printf("    source-max-conns: %v", params.SourceMaxConns)
@@ -84,6 +83,10 @@ func MainStart(params grouter.Params) {
 	log.Printf("    target-chan-size: %v", params.TargetChanSize)
 	log.Printf("    target-concurrency: %v", params.TargetConcurrency)
 
+	MainStart(params)
+}
+
+func MainStart(params grouter.Params) {
 	sourceKind := strings.Split(params.SourceSpec, ":")[0]
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
