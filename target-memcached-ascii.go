@@ -23,14 +23,14 @@ var (
 	prefix_append  = []byte("append ")
 )
 
-type MemcachedAsciiTargetHandler struct {
+type AsciiTargetHandler struct {
 	Write func(*bufio.Reader, *bufio.Writer, Request) error
 	Read func(*bufio.Reader, *bufio.Writer, Request) error
 }
 
-var MemcachedAsciiTargetHandlers =
-	map[gomemcached.CommandCode]MemcachedAsciiTargetHandler{
-	gomemcached.GET: MemcachedAsciiTargetHandler{
+var AsciiTargetHandlers =
+	map[gomemcached.CommandCode]AsciiTargetHandler{
+	gomemcached.GET: AsciiTargetHandler{
 		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
 			bw.Write(prefix_get)
 			bw.Write(req.Req.Key)
@@ -69,8 +69,8 @@ var MemcachedAsciiTargetHandlers =
 	gomemcached.APPEND: AsciiTargetMutationHandler(prefix_append),
 }
 
-func AsciiTargetMutationHandler(cmd []byte) MemcachedAsciiTargetHandler {
-	return MemcachedAsciiTargetHandler{
+func AsciiTargetMutationHandler(cmd []byte) AsciiTargetHandler {
+	return AsciiTargetHandler{
 		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
 			return AsciiTargetMutationWrite(br, bw, req, cmd)
 		},
@@ -207,7 +207,7 @@ func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request
 	for reqs := range incoming {
 		reset := false
 		for _, req := range reqs {
-			if h, ok := MemcachedAsciiTargetHandlers[req.Req.Opcode]; ok && !reset{
+			if h, ok := AsciiTargetHandlers[req.Req.Opcode]; ok && !reset{
 				err := h.Write(br, bw, req)
 				if err != nil {
 					reset = true
@@ -216,7 +216,7 @@ func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request
 		}
 		bw.Flush()
 		for _, req := range reqs {
-			if h, ok := MemcachedAsciiTargetHandlers[req.Req.Opcode]; ok && !reset {
+			if h, ok := AsciiTargetHandlers[req.Req.Opcode]; ok && !reset {
 				err := h.Read(br, bw, req)
 				if err != nil {
 					req.Res <- &gomemcached.MCResponse{
