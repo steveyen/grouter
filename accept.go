@@ -95,7 +95,7 @@ func AcceptConns(ls net.Listener, maxConns int,
 
 				go func(s io.ReadWriteCloser) {
 					source.Run(s, totConns,
-						targetChans[totConns % uint32(len(targetChans))],
+						targetChans[totConns%uint32(len(targetChans))],
 						statsChan)
 					chanClosed <- s
 					s.Close()
@@ -163,10 +163,9 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 
 		if tot_batch%200 == 0 {
 			statsChan <- Stats{
-				Keys: []string{"tot_batch",},
-				Vals: []int64{tot_batch,},
+				Keys: []string{"tot_batch"},
+				Vals: []int64{tot_batch},
 			}
 		}
 	}
 }
-
