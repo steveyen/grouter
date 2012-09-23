@@ -19,8 +19,8 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 
 	report_every := 100000
 	ops_per_round := 100
-	tot_ops_nsecs := int64(0)
-	tot_ops := 0
+	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
+	tot_workload_ops := 0
 	res := make(chan *gomemcached.MCResponse)
 	for {
 		reqs := make([]Request, ops_per_round)
@@ -41,16 +41,16 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 		}
 		reqs_end := time.Now()
 
-		tot_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
-		tot_ops += ops_per_round
-		if tot_ops%report_every == 0 {
+		tot_workload_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
+		tot_workload_ops += ops_per_round
+		if tot_workload_ops%report_every == 0 {
 			statsChan <- Stats{
 				Time: reqs_end,
-				Keys: []string {"tot_ops", "tot_ops_usecs"},
-				Vals: []int64 {int64(tot_ops), int64(tot_ops_nsecs / 1000)},
+				Keys: []string {"tot_workload_ops", "tot_workload_ops_usecs"},
+				Vals: []int64 {int64(tot_workload_ops), int64(tot_workload_ops_nsecs / 1000)},
 			}
-			tot_ops_nsecs = int64(0)
-			tot_ops = 0
+			tot_workload_ops_nsecs = int64(0)
+			tot_workload_ops = 0
 		}
 	}
 }

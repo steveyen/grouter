@@ -167,6 +167,8 @@ func StartStatsReporter(chanSize int) chan grouter.Stats {
 }
 
 func StatsReport(curr map[string] int64, prev map[string] int64) {
+	// Reports rates on paired stats that follow a naming convention
+	// like xxx and xxx_usecs.  For example, tot_ops and tot_ops_usecs.
 	for k, v := range(curr) {
 		k_usecs := k + "_usecs"
 		v_usecs := curr[k_usecs]
