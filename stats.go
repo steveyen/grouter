@@ -16,6 +16,7 @@ func StartStatsReporter(chanSize int) chan Stats {
 	statsChan := make(chan Stats, chanSize)
 	curr := make(map[string]int64)
 	prev := make(map[string]int64)
+	i := 0
 
 	go func() {
 		for {
@@ -25,10 +26,15 @@ func StartStatsReporter(chanSize int) chan Stats {
 					curr[stats.Keys[i]] += stats.Vals[i]
 				}
 			case <-reportChan:
-				StatsReport(curr, prev)
+				full := i%4 == 0
+				if full {
+					log.Printf("-------------")
+				}
+				StatsReport(curr, prev, full)
 				for k, v := range curr {
 					prev[k] = v
 				}
+				i++
 			}
 		}
 	}()
@@ -36,7 +42,7 @@ func StartStatsReporter(chanSize int) chan Stats {
 	return statsChan
 }
 
-func StatsReport(curr map[string]int64, prev map[string]int64) {
+func StatsReport(curr map[string]int64, prev map[string]int64, full bool) {
 	// Reports rates on paired stats that follow a naming convention
 	// like xxx and xxx_usecs.  For example, tot_ops and tot_ops_usecs.
 	for k, v := range curr {
@@ -45,14 +51,20 @@ func StatsReport(curr map[string]int64, prev map[string]int64) {
 		}
 		k_usecs := k + "_usecs"
 		v_usecs := curr[k_usecs]
-		if v_usecs > 0 {
+		if v_usecs > prev[k_usecs] {
 			k_per_usec := float64(v-prev[k]) / float64(v_usecs-prev[k_usecs])
 			if k_per_usec > 0 {
-				log.Printf(" %v: %v (+%v) -- per sec: %f",
-					k, v, v-prev[k], k_per_usec*1000000.0)
+				if full {
+					log.Printf(" %v: %v, per sec: %f",
+						k, v, k_per_usec*1000000.0)
+				} else {
+					log.Printf(" %v per sec: %f", k, k_per_usec*1000000.0)
+				}
 				continue
 			}
 		}
-		log.Printf(" %v: %v (+%v)", k, v, v-prev[k])
+		if full && v != prev[k] {
+			log.Printf(" %v: %v", k, v)
+		}
 	}
 }
