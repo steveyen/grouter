@@ -2,6 +2,7 @@ package grouter
 
 import (
 	"log"
+	"strings"
 	"time"
 )
 
@@ -39,14 +40,19 @@ func StatsReport(curr map[string]int64, prev map[string]int64) {
 	// Reports rates on paired stats that follow a naming convention
 	// like xxx and xxx_usecs.  For example, tot_ops and tot_ops_usecs.
 	for k, v := range curr {
+		if strings.HasSuffix(k, "_usecs") {
+			continue
+		}
 		k_usecs := k + "_usecs"
 		v_usecs := curr[k_usecs]
-		k_per_usec := float64(0.0)
 		if v_usecs > 0 {
-			k_per_usec = float64(v-prev[k]) / float64(v_usecs-prev[k_usecs])
+			k_per_usec := float64(v-prev[k]) / float64(v_usecs-prev[k_usecs])
+			if k_per_usec > 0 {
+				log.Printf(" %v: %v (+%v) -- per sec: %f",
+					k, v, v-prev[k], k_per_usec*1000000.0)
+				continue
+			}
 		}
-		if k_per_usec > 0 {
-			log.Printf("%v: %v, per sec: %f", k, v-prev[k], k_per_usec*1000000.0)
-		}
+		log.Printf(" %v: %v (+%v)", k, v, v-prev[k])
 	}
 }
