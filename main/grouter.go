@@ -87,8 +87,6 @@ func main() {
 }
 
 func MainStart(params grouter.Params) {
-	statsChan := make(chan grouter.Stats)
-
 	sourceKind := strings.Split(params.SourceSpec, ":")[0]
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
@@ -104,6 +102,14 @@ func MainStart(params grouter.Params) {
 					" due to limitations of target kind: %v",
 					targetConcurrency, targetKind)
 			}
+
+			statsChan := make(chan grouter.Stats,
+				params.SourceMaxConns + params.TargetConcurrency)
+			go func() {
+				for stats := range statsChan {
+					log.Printf("stats: %v", stats)
+				}
+			}()
 
 			// Requests coming into the shared, unbatched channel are
 			// partitioned, into concurrent "lanes", where target

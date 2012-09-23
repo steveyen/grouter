@@ -1,7 +1,6 @@
 package grouter
 
 import (
-	"log"
 	"time"
 
 	"github.com/dustin/gomemcached"
@@ -45,8 +44,11 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 		tot_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
 		tot_ops += ops_per_round
 		if tot_ops%report_every == 0 {
-			tot_ops_secs := float64(tot_ops_nsecs) / float64(1000000000.0)
-			log.Printf("ops/sec: %f", float64(tot_ops)/tot_ops_secs)
+			statsChan <- Stats{
+				Time: reqs_end,
+				Keys: []string {"tot_ops", "tot_ops_nsecs"},
+				Vals: []int64 {int64(tot_ops), int64(tot_ops_nsecs)},
+			}
 			tot_ops_nsecs = int64(0)
 			tot_ops = 0
 		}

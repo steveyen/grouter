@@ -32,8 +32,9 @@ type Request struct {
 }
 
 type Stats struct {
-	keys []string
-	vals []int
+	Time time.Time
+	Keys []string
+	Vals []int64
 }
 
 type Source interface {
