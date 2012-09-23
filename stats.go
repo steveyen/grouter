@@ -26,11 +26,10 @@ func StartStatsReporter(chanSize int) chan Stats {
 					curr[stats.Keys[i]] += stats.Vals[i]
 				}
 			case <-reportChan:
-				full := i%4 == 0
-				if full {
+				full := i%10 == 0
+				if StatsReport(curr, prev, full) && full {
 					log.Printf("-------------")
 				}
-				StatsReport(curr, prev, full)
 				for k, v := range curr {
 					prev[k] = v
 				}
@@ -42,9 +41,10 @@ func StartStatsReporter(chanSize int) chan Stats {
 	return statsChan
 }
 
-func StatsReport(curr map[string]int64, prev map[string]int64, full bool) {
+func StatsReport(curr map[string]int64, prev map[string]int64, full bool) bool {
 	// Reports rates on paired stats that follow a naming convention
 	// like xxx and xxx_usecs.  For example, tot_ops and tot_ops_usecs.
+	emitted := false
 	for k, v := range curr {
 		if strings.HasSuffix(k, "_usecs") {
 			continue
@@ -57,14 +57,18 @@ func StatsReport(curr map[string]int64, prev map[string]int64, full bool) {
 				if full {
 					log.Printf(" %v: %v, per sec: %f",
 						k, v, k_per_usec*1000000.0)
+					emitted = true
 				} else {
 					log.Printf(" %v per sec: %f", k, k_per_usec*1000000.0)
+					emitted = true
 				}
 				continue
 			}
 		}
 		if full && v != prev[k] {
 			log.Printf(" %v: %v", k, v)
+			emitted = true
 		}
 	}
+	return emitted
 }
