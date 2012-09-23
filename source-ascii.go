@@ -25,6 +25,9 @@ type AsciiSource struct {
 
 func (self AsciiSource) Run(s io.ReadWriter,
 	clientNum uint32, targetChan chan []Request, statsChan chan Stats) {
+	tot_source_ascii_ops_nsecs := int64(0)
+	tot_source_ascii_ops := 0
+
 	br := bufio.NewReader(s)
 	bw := bufio.NewWriter(s)
 	res := make(chan *gomemcached.MCResponse)
@@ -52,15 +55,22 @@ func (self AsciiSource) Run(s io.ReadWriter,
 		}
 		reqs_end := time.Now()
 
-		statsChan <- Stats{
-			Keys: []string{
-				"tot_source_ascii_ops",
-				"tot_source_ascii_ops_usecs",
-			},
-			Vals: []int64{
-				int64(1),
-				int64(reqs_end.Sub(reqs_start).Nanoseconds() / 1000),
-			},
+		tot_source_ascii_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
+		tot_source_ascii_ops += 1
+
+		if tot_source_ascii_ops%100 == 0 {
+			statsChan <- Stats{
+				Keys: []string{
+					"tot_source_ascii_ops",
+					"tot_source_ascii_ops_usecs",
+				},
+				Vals: []int64{
+					int64(tot_source_ascii_ops),
+					int64(tot_source_ascii_ops_nsecs / 1000),
+				},
+			}
+			tot_source_ascii_ops_nsecs = 0
+			tot_source_ascii_ops = 0
 		}
 	}
 }
