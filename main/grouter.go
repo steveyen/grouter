@@ -5,6 +5,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/steveyen/grouter"
 )
@@ -137,13 +138,43 @@ func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
 }
 
 func StartStatsReporter(chanSize int) chan grouter.Stats {
+	reportChan := time.Tick(2 * time.Second)
 	statsChan := make(chan grouter.Stats, chanSize)
+	curr := make(map[string] int64)
+	prev := make(map[string] int64)
+
 	go func() {
-		for stats := range statsChan {
-			log.Printf("stats: %v", stats)
+		n := 0
+		for {
+			select {
+			case stats := <-statsChan:
+				for i := 0; i < len(stats.Keys); i++ {
+					key := stats.Keys[i]
+					val := stats.Vals[i]
+					curr[key] += val
+				}
+				n += 1
+			case <-reportChan:
+				StatsReport(curr, prev)
+				for k, v := range(curr) {
+					prev[k] = v
+				}
+			}
 		}
 	}()
+
 	return statsChan
+}
+
+func StatsReport(curr map[string] int64, prev map[string] int64) {
+	for k, v := range(curr) {
+		k_usecs := k + "_usecs"
+		v_usecs := curr[k_usecs]
+		if v_usecs > 0 {
+			k_per_usec := float64(v - prev[k]) / float64(v_usecs - prev[k_usecs])
+			log.Printf("%v/sec = %f", k, k_per_usec * 1000000.0)
+		}
+	}
 }
 
 func EndPointExamples(m map[string]EndPoint) (rv string) {
