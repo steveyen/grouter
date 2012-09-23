@@ -47,6 +47,20 @@ var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
 			Key:    req.Req.Key,
 		}
 	},
+	gomemcached.DELETE: func(s *MemoryStorage, req Request) {
+		ret := &gomemcached.MCResponse{
+			Opcode: req.Req.Opcode,
+			Opaque: req.Req.Opaque,
+			Key:    req.Req.Key,
+		}
+		if _, ok := s.data[string(req.Req.Key)]; ok {
+			delete(s.data, string(req.Req.Key))
+			ret.Status = gomemcached.SUCCESS
+		} else {
+			ret.Status = gomemcached.KEY_ENOENT
+		}
+		req.Res <- ret
+	},
 }
 
 func MemoryStorageRun(spec string, params Params, incoming chan []Request,

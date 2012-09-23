@@ -147,6 +147,40 @@ var asciiCmds = map[string]*AsciiCmd{
 			return true
 		},
 	},
+	"delete": &AsciiCmd{
+		gomemcached.DELETE,
+		func(source *AsciiSource,
+			targetChan chan []Request, res chan *gomemcached.MCResponse,
+			cmd *AsciiCmd, req []string, br *bufio.Reader, bw *bufio.Writer,
+			clientNum uint32) bool {
+			if len(req) != 2 {
+				return AsciiClientError(bw, "expected 1 param for delete command\r\n")
+			}
+			key := req[1]
+			if len(key) <= 0 {
+				return AsciiClientError(bw, "missing key\r\n")
+			}
+			reqs := make([]Request, 1)
+			reqs[0] = Request{
+				"default",
+				&gomemcached.MCRequest{
+					Opcode: cmd.Opcode,
+					Key:    []byte(key),
+				},
+				res,
+				clientNum,
+			}
+			targetChan <- reqs
+			response := <-res
+			if response.Status == gomemcached.SUCCESS {
+				bw.Write([]byte("DELETED\r\n"))
+			} else {
+				bw.Write([]byte("NOT_FOUND\r\n"))
+			}
+			bw.Flush()
+			return true
+		},
+	},
 	"set":     &AsciiCmd{gomemcached.SET, AsciiCmdMutation},
 	"add":     &AsciiCmd{gomemcached.ADD, AsciiCmdMutation},
 	"replace": &AsciiCmd{gomemcached.REPLACE, AsciiCmdMutation},
