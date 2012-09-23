@@ -31,12 +31,6 @@ type Request struct {
 	ClientNum uint32
 }
 
-type Stats struct {
-	Time time.Time
-	Keys []string
-	Vals []int64
-}
-
 type Source interface {
 	Run(s io.ReadWriter, clientNum uint32, targetChan chan []Request,
 		statsChan chan Stats)

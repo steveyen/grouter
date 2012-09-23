@@ -45,7 +45,6 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 		tot_workload_ops += ops_per_round
 		if tot_workload_ops%report_every == 0 {
 			statsChan <- Stats{
-				Time: reqs_end,
 				Keys: []string{
 					"tot_workload_ops",
 					"tot_workload_ops_usecs",
