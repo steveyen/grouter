@@ -136,17 +136,21 @@ func Reconnect(spec string, dialer func(string) (interface{}, error)) interface{
 }
 
 // Batch up requests from the incoming channel to feed to the outgoing channel.
-func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Request) {
+func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Request,
+	statsChan chan Stats) {
 	batch := make([]Request, 0, maxBatchSize)
+	tot_batch := int64(0)
 
 	for {
 		if len(batch) > 0 {
 			if len(batch) >= cap(batch) {
 				outgoing <- batch
+				tot_batch += 1
 				batch = make([]Request, 0, maxBatchSize)
 			} else {
 				select {
 				case outgoing <- batch:
+					tot_batch += 1
 					batch = make([]Request, 0, maxBatchSize)
 				case reqs := <-incoming:
 					batch = append(batch, reqs...)
@@ -155,6 +159,13 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 		} else {
 			reqs := <-incoming
 			batch = append(batch, reqs...)
+		}
+
+		if tot_batch%200 == 0 {
+			statsChan <- Stats{
+				Keys: []string{"tot_batch",},
+				Vals: []int64{tot_batch,},
+			}
 		}
 	}
 }

@@ -129,7 +129,7 @@ func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
 	params grouter.Params, statsChan chan grouter.Stats) {
 	batched := make(chan []grouter.Request, params.TargetChanSize)
 	go func() {
-		grouter.BatchRequests(params.TargetChanSize, unbatched, batched)
+		grouter.BatchRequests(params.TargetChanSize, unbatched, batched, statsChan)
 	}()
 	go func() {
 		target.StartTarget(params.TargetSpec, params, batched, statsChan)
