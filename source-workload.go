@@ -46,8 +46,8 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 		if tot_ops%report_every == 0 {
 			statsChan <- Stats{
 				Time: reqs_end,
-				Keys: []string {"tot_ops", "tot_ops_nsecs"},
-				Vals: []int64 {int64(tot_ops), int64(tot_ops_nsecs)},
+				Keys: []string {"tot_ops", "tot_ops_usecs"},
+				Vals: []int64 {int64(tot_ops), int64(tot_ops_nsecs / 1000)},
 			}
 			tot_ops_nsecs = int64(0)
 			tot_ops = 0
