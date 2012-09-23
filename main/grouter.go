@@ -144,7 +144,6 @@ func StartStatsReporter(chanSize int) chan grouter.Stats {
 	prev := make(map[string] int64)
 
 	go func() {
-		n := 0
 		for {
 			select {
 			case stats := <-statsChan:
@@ -153,7 +152,6 @@ func StartStatsReporter(chanSize int) chan grouter.Stats {
 					val := stats.Vals[i]
 					curr[key] += val
 				}
-				n += 1
 			case <-reportChan:
 				StatsReport(curr, prev)
 				for k, v := range(curr) {
