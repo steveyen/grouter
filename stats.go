@@ -41,8 +41,11 @@ func StatsReport(curr map[string]int64, prev map[string]int64) {
 	for k, v := range curr {
 		k_usecs := k + "_usecs"
 		v_usecs := curr[k_usecs]
+		k_per_usec := float64(0.0)
 		if v_usecs > 0 {
-			k_per_usec := float64(v-prev[k]) / float64(v_usecs-prev[k_usecs])
+			k_per_usec = float64(v-prev[k]) / float64(v_usecs-prev[k_usecs])
+		}
+		if k_per_usec > 0 {
 			log.Printf("%v/sec = %f", k, k_per_usec*1000000.0)
 		}
 	}
