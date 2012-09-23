@@ -99,19 +99,18 @@ func MainStart(params grouter.Params) {
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
 		if target, ok := Targets[targetKind]; ok {
-			targetConcurrency := params.TargetConcurrency
 			if (target.MaxConcurrency > 0 &&
-				target.MaxConcurrency < targetConcurrency) {
-				targetConcurrency = target.MaxConcurrency
+				target.MaxConcurrency < params.TargetConcurrency) {
+				params.TargetConcurrency = target.MaxConcurrency
 				log.Printf("    target-concurrency clipped to: %v;" +
 					" due to limitations of target kind: %v",
-					targetConcurrency, targetKind)
+					params.TargetConcurrency, targetKind)
 			}
 
 			statsChan := grouter.StartStatsReporter(
 				params.SourceMaxConns + params.TargetConcurrency)
 
-			targetChans := make([]chan []grouter.Request, targetConcurrency)
+			targetChans := make([]chan []grouter.Request, params.TargetConcurrency)
 			for i := range(targetChans) {
 				targetChans[i] = make(chan []grouter.Request, params.TargetChanSize)
 				StartTarget(target, targetChans[i], params, statsChan)

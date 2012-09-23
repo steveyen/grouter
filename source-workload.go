@@ -8,7 +8,7 @@ import (
 
 func WorkLoad(sourceSpec string, params Params, targetChans []chan []Request,
 	statsChan chan Stats) {
-	for i := 1; i < params.SourceMaxConns; i++ {
+	for i := 1; i < params.TargetConcurrency; i++ {
 		go run(i, sourceSpec, targetChans[i % len(targetChans)], statsChan)
 	}
 	run(0, sourceSpec, targetChans[0], statsChan)
