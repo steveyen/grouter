@@ -62,46 +62,22 @@ var MemcachedAsciiTargetHandlers =
 			return nil
 		},
 	},
-	gomemcached.SET: MemcachedAsciiTargetHandler{
+	gomemcached.SET: AsciiTargetMutationHandler(prefix_set),
+	gomemcached.ADD: AsciiTargetMutationHandler(prefix_add),
+	gomemcached.REPLACE: AsciiTargetMutationHandler(prefix_replace),
+	gomemcached.PREPEND: AsciiTargetMutationHandler(prefix_prepend),
+	gomemcached.APPEND: AsciiTargetMutationHandler(prefix_append),
+}
+
+func AsciiTargetMutationHandler(cmd []byte) MemcachedAsciiTargetHandler {
+	return MemcachedAsciiTargetHandler{
 		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationWrite(br, bw, req, prefix_set)
+			return AsciiTargetMutationWrite(br, bw, req, cmd)
 		},
 		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationRead(br, bw, req, prefix_set)
+			return AsciiTargetMutationRead(br, bw, req, cmd)
 		},
-	},
-	gomemcached.ADD: MemcachedAsciiTargetHandler{
-		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationWrite(br, bw, req, prefix_add)
-		},
-		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationRead(br, bw, req, prefix_add)
-		},
-	},
-	gomemcached.REPLACE: MemcachedAsciiTargetHandler{
-		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationWrite(br, bw, req, prefix_replace)
-		},
-		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationRead(br, bw, req, prefix_replace)
-		},
-	},
-	gomemcached.PREPEND: MemcachedAsciiTargetHandler{
-		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationWrite(br, bw, req, prefix_prepend)
-		},
-		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationRead(br, bw, req, prefix_prepend)
-		},
-	},
-	gomemcached.APPEND: MemcachedAsciiTargetHandler{
-		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationWrite(br, bw, req, prefix_append)
-		},
-		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-			return AsciiTargetMutationRead(br, bw, req, prefix_append)
-		},
-	},
+	}
 }
 
 func AsciiTargetMutationWrite(br *bufio.Reader, bw *bufio.Writer,
