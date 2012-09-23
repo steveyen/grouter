@@ -14,7 +14,7 @@ func WorkLoad(sourceSpec string, params Params, targetChan chan []Request,
 	run(0, sourceSpec, targetChan, statsChan)
 }
 
-func run(id int, sourceSpec string, targetChan chan []Request,
+func run(clientNum int, sourceSpec string, targetChan chan []Request,
 	statsChan chan Stats) {
 	report_every := 1000
 	ops_per_round := 100
@@ -24,13 +24,14 @@ func run(id int, sourceSpec string, targetChan chan []Request,
 	for {
 		reqs := make([]Request, ops_per_round)
 		for i := 0; i < ops_per_round; i++ {
-			reqs[i] = Request{"default",
-				&gomemcached.MCRequest{
+			reqs[i] = Request{
+				Bucket: "default",
+				Req: &gomemcached.MCRequest{
 					Opcode: gomemcached.GET,
 					Key:    []byte("hello"),
 				},
-				res,
-				uint32(id),
+				Res:       res,
+				ClientNum: uint32(clientNum),
 			}
 		}
 		reqs_start := time.Now()
