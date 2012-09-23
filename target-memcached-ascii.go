@@ -23,56 +23,88 @@ var (
 	prefix_append  = []byte("append ")
 )
 
-type MemcachedAsciiTargetHandler func(*bufio.Reader, *bufio.Writer, Request) error
+type MemcachedAsciiTargetHandler struct {
+	Write func(*bufio.Reader, *bufio.Writer, Request) error
+	Read func(*bufio.Reader, *bufio.Writer, Request) error
+}
 
-var MemcachedAsciiTargetHandlers = map[gomemcached.CommandCode]MemcachedAsciiTargetHandler{
-	gomemcached.GET: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-		bw.Write(prefix_get)
-		bw.Write(req.Req.Key)
-		bw.Write(crnl)
-		bw.Flush()
-
-		numValues, endParts, err := AsciiTargetReadLines(br, req)
-		if err != nil {
-			return err
-		}
-		if endParts[0] == "END" {
-			if numValues <= 0 {
+var MemcachedAsciiTargetHandlers =
+	map[gomemcached.CommandCode]MemcachedAsciiTargetHandler{
+	gomemcached.GET: MemcachedAsciiTargetHandler{
+		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			bw.Write(prefix_get)
+			bw.Write(req.Req.Key)
+			bw.Write(crnl)
+			return nil
+		},
+		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			numValues, endParts, err := AsciiTargetReadLines(br, req)
+			if err != nil {
+				return err
+			}
+			if endParts[0] == "END" {
+				if numValues <= 0 {
+					req.Res <- &gomemcached.MCResponse{
+						Opcode: req.Req.Opcode,
+						Status: gomemcached.KEY_ENOENT,
+						Opaque: req.Req.Opaque,
+						Key:    req.Req.Key,
+					}
+				}
+			} else {
 				req.Res <- &gomemcached.MCResponse{
 					Opcode: req.Req.Opcode,
-					Status: gomemcached.KEY_ENOENT,
+					Status: gomemcached.EINVAL,
 					Opaque: req.Req.Opaque,
 					Key:    req.Req.Key,
 				}
 			}
-		} else {
-			req.Res <- &gomemcached.MCResponse{
-				Opcode: req.Req.Opcode,
-				Status: gomemcached.EINVAL,
-				Opaque: req.Req.Opaque,
-				Key:    req.Req.Key,
-			}
-		}
-		return nil
+			return nil
+		},
 	},
-	gomemcached.SET: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-		return AsciiTargetMutation(br, bw, req, prefix_set)
+	gomemcached.SET: MemcachedAsciiTargetHandler{
+		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationWrite(br, bw, req, prefix_set)
+		},
+		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationRead(br, bw, req, prefix_set)
+		},
 	},
-	gomemcached.ADD: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-		return AsciiTargetMutation(br, bw, req, prefix_add)
+	gomemcached.ADD: MemcachedAsciiTargetHandler{
+		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationWrite(br, bw, req, prefix_add)
+		},
+		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationRead(br, bw, req, prefix_add)
+		},
 	},
-	gomemcached.REPLACE: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-		return AsciiTargetMutation(br, bw, req, prefix_replace)
+	gomemcached.REPLACE: MemcachedAsciiTargetHandler{
+		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationWrite(br, bw, req, prefix_replace)
+		},
+		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationRead(br, bw, req, prefix_replace)
+		},
 	},
-	gomemcached.PREPEND: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-		return AsciiTargetMutation(br, bw, req, prefix_prepend)
+	gomemcached.PREPEND: MemcachedAsciiTargetHandler{
+		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationWrite(br, bw, req, prefix_prepend)
+		},
+		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationRead(br, bw, req, prefix_prepend)
+		},
 	},
-	gomemcached.APPEND: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
-		return AsciiTargetMutation(br, bw, req, prefix_append)
+	gomemcached.APPEND: MemcachedAsciiTargetHandler{
+		Write: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationWrite(br, bw, req, prefix_append)
+		},
+		Read: func(br *bufio.Reader, bw *bufio.Writer, req Request) error {
+			return AsciiTargetMutationRead(br, bw, req, prefix_append)
+		},
 	},
 }
 
-func AsciiTargetMutation(br *bufio.Reader, bw *bufio.Writer,
+func AsciiTargetMutationWrite(br *bufio.Reader, bw *bufio.Writer,
 	req Request, cmd []byte) error {
 	flg := uint64(binary.BigEndian.Uint32(req.Req.Extras))
 	exp := uint64(binary.BigEndian.Uint32(req.Req.Extras[4:]))
@@ -88,8 +120,12 @@ func AsciiTargetMutation(br *bufio.Reader, bw *bufio.Writer,
 	bw.Write(crnl)
 	bw.Write(req.Req.Body)
 	bw.Write(crnl)
-	bw.Flush()
 
+	return nil
+}
+
+func AsciiTargetMutationRead(br *bufio.Reader, bw *bufio.Writer,
+	req Request, cmd []byte) error {
 	line, isPrefix, err := br.ReadLine()
 	if err != nil {
 		return err
@@ -193,23 +229,26 @@ func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request
 	bw := bufio.NewWriter(conn)
 
 	for reqs := range incoming {
+		reset := false
 		for _, req := range reqs {
-			if h, ok := MemcachedAsciiTargetHandlers[req.Req.Opcode]; ok {
-				err := h(br, bw, req)
+			if h, ok := MemcachedAsciiTargetHandlers[req.Req.Opcode]; ok && !reset{
+				err := h.Write(br, bw, req)
+				if err != nil {
+					reset = true
+				}
+			}
+		}
+		bw.Flush()
+		for _, req := range reqs {
+			if h, ok := MemcachedAsciiTargetHandlers[req.Req.Opcode]; ok && !reset {
+				err := h.Read(br, bw, req)
 				if err != nil {
 					req.Res <- &gomemcached.MCResponse{
 						Opcode: req.Req.Opcode,
 						Status: gomemcached.EINVAL,
 						Opaque: req.Req.Opaque,
 					}
-
-					log.Printf("warn: memcached-ascii closing conn; saw error: %v", err)
-					conn.Close()
-					conn = Reconnect(spec, func(spec string) (interface{}, error) {
-						return net.Dial("tcp", spec)
-					}).(net.Conn)
-					br = bufio.NewReader(conn)
-					bw = bufio.NewWriter(conn)
+					reset = true
 				}
 			} else {
 				req.Res <- &gomemcached.MCResponse{
@@ -218,6 +257,16 @@ func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request
 					Opaque: req.Req.Opaque,
 				}
 			}
+		}
+
+		if reset {
+			log.Printf("warn: memcached-ascii closing conn; saw error: %v", err)
+			conn.Close()
+			conn = Reconnect(spec, func(spec string) (interface{}, error) {
+				return net.Dial("tcp", spec)
+			}).(net.Conn)
+			br = bufio.NewReader(conn)
+			bw = bufio.NewWriter(conn)
 		}
 	}
 }
