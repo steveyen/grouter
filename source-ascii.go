@@ -8,6 +8,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dustin/gomemcached"
 )
@@ -39,12 +40,26 @@ func (self AsciiSource) Run(s io.ReadWriter,
 		}
 
 		req := strings.Split(strings.TrimSpace(string(buf)), " ")
+
+		reqs_start := time.Now()
 		if asciiCmd, ok := asciiCmds[req[0]]; ok {
 			if !asciiCmd.Handler(&self, targetChan, res, asciiCmd, req, br, bw, clientNum) {
 				return
 			}
 		} else {
 			AsciiClientError(bw, "unknown command - "+req[0]+"\r\n")
+		}
+		reqs_end := time.Now()
+
+		statsChan <- Stats{
+			Keys: []string{
+				"tot_source_ascii_ops",
+				"tot_source_ascii_ops_usecs",
+			},
+			Vals: []int64{
+				int64(1),
+				int64(reqs_end.Sub(reqs_start).Nanoseconds() / 1000),
+			},
 		}
 	}
 }
