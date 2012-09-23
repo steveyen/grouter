@@ -103,13 +103,7 @@ func MainStart(params grouter.Params) {
 					targetConcurrency, targetKind)
 			}
 
-			statsChan := make(chan grouter.Stats,
-				params.SourceMaxConns + params.TargetConcurrency)
-			go func() {
-				for stats := range statsChan {
-					log.Printf("stats: %v", stats)
-				}
-			}()
+			statsChan := StartStatsReporter(params.SourceMaxConns + params.TargetConcurrency)
 
 			// Requests coming into the shared, unbatched channel are
 			// partitioned, into concurrent "lanes", where target
@@ -140,6 +134,16 @@ func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
 	go func() {
 		target.Start(params.TargetSpec, params, batched, statsChan)
 	}()
+}
+
+func StartStatsReporter(chanSize int) chan grouter.Stats {
+	statsChan := make(chan grouter.Stats, chanSize)
+	go func() {
+		for stats := range statsChan {
+			log.Printf("stats: %v", stats)
+		}
+	}()
+	return statsChan
 }
 
 func EndPointExamples(m map[string]EndPoint) (rv string) {
