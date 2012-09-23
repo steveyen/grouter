@@ -8,15 +8,14 @@ import (
 
 func WorkLoad(sourceSpec string, params Params, targetChan chan []Request,
 	statsChan chan Stats) {
-	run(sourceSpec, params.SourceMaxConns, targetChan, statsChan)
+	for i := 1; i < params.SourceMaxConns; i++ {
+		go run(i, sourceSpec, targetChan, statsChan)
+	}
+	run(0, sourceSpec, targetChan, statsChan)
 }
 
-func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
+func run(id int, sourceSpec string, targetChan chan []Request,
 	statsChan chan Stats) {
-	if sourceMaxConns > 1 {
-		go run(sourceSpec, sourceMaxConns-1, targetChan, statsChan)
-	}
-
 	report_every := 1000
 	ops_per_round := 100
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
@@ -31,7 +30,7 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 					Key:    []byte("hello"),
 				},
 				res,
-				uint32(sourceMaxConns),
+				uint32(id),
 			}
 		}
 		reqs_start := time.Now()
