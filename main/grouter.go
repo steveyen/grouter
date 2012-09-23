@@ -11,42 +11,50 @@ import (
 
 type EndPoint struct {
 	Usage string // Help string.
-	Start func(string, grouter.Params, chan []grouter.Request, chan grouter.Stats)
+	StartSource func(string, grouter.Params, []chan []grouter.Request, chan grouter.Stats)
+	StartTarget func(string, grouter.Params, chan []grouter.Request, chan grouter.Stats)
 	MaxConcurrency int // Some end-points have limited concurrency.
 }
 
 // Available sources of requests.
 var Sources = map[string]EndPoint{
 	"memcached": EndPoint{
-		"memcached:LISTEN_INTERFACE:LISTEN_PORT",
-		grouter.MakeListenSourceFunc(&grouter.AsciiSource{}), 0,
+		Usage: "memcached:LISTEN_INTERFACE:LISTEN_PORT",
+		StartSource: grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
 	},
 	"memcached-ascii": EndPoint{
-		"memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT",
-		grouter.MakeListenSourceFunc(&grouter.AsciiSource{}), 0,
+		Usage: "memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT",
+		StartSource: grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
 	},
-	"workload": EndPoint{"workload", grouter.WorkLoad, 0},
+	"workload": EndPoint{
+		Usage: "workload",
+		StartSource: grouter.WorkLoad,
+	},
 }
 
 // Available targets of requests.
 var Targets = map[string]EndPoint{
 	"http": EndPoint{
-		"http://COUCHBASE_HOST:COUCHBASE_PORT",
-        grouter.CouchbaseTargetRun, 0,
+		Usage: "http://COUCHBASE_HOST:COUCHBASE_PORT",
+        StartTarget: grouter.CouchbaseTargetRun,
 	},
 	"couchbase": EndPoint{
-		"couchbase://COUCHBASE_HOST:COUCHBASE_PORT",
-        grouter.CouchbaseTargetRun, 0,
+		Usage: "couchbase://COUCHBASE_HOST:COUCHBASE_PORT",
+        StartTarget: grouter.CouchbaseTargetRun,
 	},
 	"memcached-ascii": EndPoint{
-		"memcached-ascii:HOST:PORT",
-		grouter.MemcachedAsciiTargetRun, 0,
+		Usage: "memcached-ascii:HOST:PORT",
+		StartTarget: grouter.MemcachedAsciiTargetRun,
 	},
 	"memcached-binary": EndPoint{
-		"memcached-binary:HOST:PORT",
-		grouter.MemcachedBinaryTargetRun, 0,
+		Usage: "memcached-binary:HOST:PORT",
+		StartTarget: grouter.MemcachedBinaryTargetRun,
 	},
-	"memory": EndPoint{"memory", grouter.MemoryStorageRun, 1},
+	"memory": EndPoint{
+		Usage: "memory",
+		StartTarget: grouter.MemoryStorageRun,
+		MaxConcurrency: 1,
+	},
 }
 
 func main() {
@@ -91,9 +99,6 @@ func MainStart(params grouter.Params) {
 	if source, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
 		if target, ok := Targets[targetKind]; ok {
-			// The source will send requests to a shared, unbatched channel.
-			unbatched := make(chan []grouter.Request, params.TargetChanSize)
-
 			targetConcurrency := params.TargetConcurrency
 			if (target.MaxConcurrency > 0 &&
 				target.MaxConcurrency < targetConcurrency) {
@@ -106,18 +111,13 @@ func MainStart(params grouter.Params) {
 			statsChan := grouter.StartStatsReporter(
 				params.SourceMaxConns + params.TargetConcurrency)
 
-			// Requests coming into the shared, unbatched channel are
-			// partitioned, into concurrent "lanes", where target
-			// goroutines are assigned to each own its own lane (channel).
-			lanes := make([]chan []grouter.Request, targetConcurrency)
-			for i := range(lanes) {
-				lanes[i] = make(chan []grouter.Request, params.TargetChanSize)
-				StartTarget(target, lanes[i], params, statsChan)
+			targetChans := make([]chan []grouter.Request, targetConcurrency)
+			for i := range(targetChans) {
+				targetChans[i] = make(chan []grouter.Request, params.TargetChanSize)
+				StartTarget(target, targetChans[i], params, statsChan)
 			}
-			go grouter.PartitionRequests(unbatched, lanes)
 
-			// Start the source after all the lanes and channels are setup.
-			source.Start(params.SourceSpec, params, unbatched, statsChan)
+			source.StartSource(params.SourceSpec, params, targetChans, statsChan)
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
 		}
@@ -133,7 +133,7 @@ func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
 		grouter.BatchRequests(params.TargetChanSize, unbatched, batched)
 	}()
 	go func() {
-		target.Start(params.TargetSpec, params, batched, statsChan)
+		target.StartTarget(params.TargetSpec, params, batched, statsChan)
 	}()
 }
 

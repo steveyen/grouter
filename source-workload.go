@@ -6,12 +6,12 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-func WorkLoad(sourceSpec string, params Params, targetChan chan []Request,
+func WorkLoad(sourceSpec string, params Params, targetChans []chan []Request,
 	statsChan chan Stats) {
 	for i := 1; i < params.SourceMaxConns; i++ {
-		go run(i, sourceSpec, targetChan, statsChan)
+		go run(i, sourceSpec, targetChans[i % len(targetChans)], statsChan)
 	}
-	run(0, sourceSpec, targetChan, statsChan)
+	run(0, sourceSpec, targetChans[0], statsChan)
 }
 
 func run(clientNum int, sourceSpec string, targetChan chan []Request,
