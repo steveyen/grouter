@@ -20,6 +20,7 @@ var (
 )
 
 type AsciiSource struct {
+	// A source that handles memcached ascii protocol requests.
 }
 
 func (self AsciiSource) Run(s io.ReadWriter,
