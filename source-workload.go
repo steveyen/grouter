@@ -17,7 +17,7 @@ func run(sourceSpec string, sourceMaxConns int, targetChan chan []Request,
 		go run(sourceSpec, sourceMaxConns-1, targetChan, statsChan)
 	}
 
-	report_every := 100000
+	report_every := 1000
 	ops_per_round := 100
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0
