@@ -75,8 +75,7 @@ func MemoryStorageRun(spec string, params Params, statsChan chan Stats) Target {
 	}
 
 	go func() {
-		for {
-			reqs := <-s.incoming
+		for reqs := range s.incoming {
 			for _, req := range reqs {
 				if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
 					h(&s, req)
