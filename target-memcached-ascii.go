@@ -212,7 +212,12 @@ func MemcachedAsciiTargetStart(spec string, params Params,
 
 	for i := range s.incomingChans {
 		s.incomingChans[i] = make(chan []Request, params.TargetChanSize)
-		MemcachedAsciiTargetStartIncoming(s, s.incomingChans[i])
+		incomingBatched := make(chan []Request, params.TargetChanSize)
+		go func() {
+			BatchRequests(params.TargetChanSize,
+				s.incomingChans[i], incomingBatched, statsChan)
+		}()
+		MemcachedAsciiTargetStartIncoming(s, incomingBatched)
 	}
 
 	return s

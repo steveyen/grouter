@@ -113,18 +113,6 @@ func MainStart(params grouter.Params) {
 			target := targetDef.StartTarget(params.TargetSpec, params, statsChan)
 
 			sourceDef.RunSource(params.SourceSpec, params, target, statsChan)
-
-			// --------------------
-			/*
-			targetChans := make([]chan []grouter.Request, params.TargetConcurrency)
-			for i := range(targetChans) {
-				targetChans[i] = make(chan []grouter.Request, params.TargetChanSize)
-				StartTarget(target, targetChans[i], params, statsChan)
-			}
-
-			sourceDef.StartSource(params.SourceSpec, params, targetChans, statsChan)
-			 */
-			// --------------------
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
 		}
@@ -132,19 +120,6 @@ func MainStart(params grouter.Params) {
 		log.Fatalf("error: unknown source kind: %s", params.SourceSpec)
 	}
 }
-
-/*
-func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
-	params grouter.Params, statsChan chan grouter.Stats) {
-	batched := make(chan []grouter.Request, params.TargetChanSize)
-	go func() {
-		grouter.BatchRequests(params.TargetChanSize, unbatched, batched, statsChan)
-	}()
-	go func() {
-		target.StartTarget(params.TargetSpec, params, batched, statsChan)
-	}()
-}
-*/
 
 func EndPointExamples(m map[string]EndPoint) (rv string) {
 	mk := make([]string, len(m))
