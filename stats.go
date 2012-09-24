@@ -12,14 +12,14 @@ type Stats struct {
 }
 
 func StartStatsReporter(chanSize int) chan Stats {
-	reportSecs := 2 * time.Second
-	reportChan := time.Tick(reportSecs)
 	statsChan := make(chan Stats, chanSize)
-	curr := make(map[string]int64)
-	prev := make(map[string]int64)
-	i := 0
 
 	go func() {
+		reportSecs := 2 * time.Second
+		reportChan := time.Tick(reportSecs)
+		reportNum := 0
+		curr := make(map[string]int64)
+		prev := make(map[string]int64)
 		for {
 			select {
 			case stats := <-statsChan:
@@ -27,14 +27,14 @@ func StartStatsReporter(chanSize int) chan Stats {
 					curr[stats.Keys[i]] += stats.Vals[i]
 				}
 			case <-reportChan:
-				full := i%10 == 0
+				full := reportNum%10 == 0
 				if StatsReport(curr, prev, reportSecs, full) && full {
 					log.Printf("-------------")
 				}
 				for k, v := range curr {
 					prev[k] = v
 				}
-				i++
+				reportNum++
 			}
 		}
 	}()
