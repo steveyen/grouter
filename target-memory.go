@@ -7,8 +7,8 @@ import (
 )
 
 type MemoryStorage struct {
-	data map[string]gomemcached.MCItem
-	cas  uint64
+	data     map[string]gomemcached.MCItem
+	cas      uint64
 	incoming chan []Request
 }
 
@@ -70,7 +70,7 @@ func (s MemoryStorage) PickChannel(clientNum uint32, bucket string) chan []Reque
 
 func MemoryStorageRun(spec string, params Params, statsChan chan Stats) Target {
 	s := MemoryStorage{
-		data: make(map[string]gomemcached.MCItem),
+		data:     make(map[string]gomemcached.MCItem),
 		incoming: make(chan []Request, params.TargetChanSize),
 	}
 
