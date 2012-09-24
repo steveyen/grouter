@@ -196,8 +196,7 @@ type MemcachedAsciiTarget struct {
 	incoming chan []Request
 }
 
-func (s MemcachedAsciiTarget) PickChannel(clientNum uint32, bucket string,
-	cmd string, key string) chan []Request {
+func (s MemcachedAsciiTarget) PickChannel(clientNum uint32, bucket string) chan []Request {
 	return s.incoming
 }
 

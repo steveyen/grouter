@@ -32,7 +32,7 @@ type Request struct {
 }
 
 type Target interface {
-	PickChannel(clientNum uint32, bucket string, cmd string, key string) chan []Request
+	PickChannel(clientNum uint32, bucket string) chan []Request
 }
 
 type Source interface {

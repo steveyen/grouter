@@ -127,7 +127,7 @@ var asciiCmds = map[string]*AsciiCmd{
 				res,
 				clientNum,
 			}
-			targetChan := target.PickChannel(clientNum, "default", "", "")
+			targetChan := target.PickChannel(clientNum, "default")
 			targetChan <- reqs
 			response := <-res
 			if response.Status == gomemcached.SUCCESS {
@@ -171,7 +171,7 @@ var asciiCmds = map[string]*AsciiCmd{
 				res,
 				clientNum,
 			}
-			targetChan := target.PickChannel(clientNum, "default", "", "")
+			targetChan := target.PickChannel(clientNum, "default")
 			targetChan <- reqs
 			response := <-res
 			if response.Status == gomemcached.SUCCESS {
@@ -244,7 +244,7 @@ func AsciiCmdMutation(source *AsciiSource,
 		res,
 		clientNum,
 	}
-	targetChan := target.PickChannel(clientNum, "default", "", "")
+	targetChan := target.PickChannel(clientNum, "default")
 	targetChan <- reqs
 	response := <-res
 	if response.Status == gomemcached.SUCCESS {

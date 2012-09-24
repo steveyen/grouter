@@ -64,8 +64,7 @@ var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
 	},
 }
 
-func (s MemoryStorage) PickChannel(clientNum uint32, bucket string,
-	cmd string, key string) chan []Request {
+func (s MemoryStorage) PickChannel(clientNum uint32, bucket string) chan []Request {
 	return s.incoming
 }
 

@@ -34,7 +34,7 @@ func run(clientNum uint32, sourceSpec string, target Target, statsChan chan Stat
 			}
 		}
 		reqs_start := time.Now()
-		targetChan := target.PickChannel(clientNum, bucket, "", "")
+		targetChan := target.PickChannel(clientNum, bucket)
 		targetChan <- reqs
 		for i := 0; i < ops_per_round; i++ {
 			<-res

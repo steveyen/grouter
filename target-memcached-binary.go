@@ -12,8 +12,7 @@ type MemcachedBinaryTarget struct {
 	incoming chan []Request
 }
 
-func (s MemcachedBinaryTarget) PickChannel(clientNum uint32, bucket string,
-	cmd string, key string) chan []Request {
+func (s MemcachedBinaryTarget) PickChannel(clientNum uint32, bucket string) chan []Request {
 	return s.incoming
 }
 
