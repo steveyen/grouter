@@ -31,13 +31,17 @@ type Request struct {
 	ClientNum uint32
 }
 
+type Target interface {
+	PickChannel(clientNum uint32, bucket string, cmd string, key string) chan []Request
+}
+
 type Source interface {
-	Run(s io.ReadWriter, clientNum uint32, targetChan chan []Request, statsChan chan Stats)
+	Run(s io.ReadWriter, clientNum uint32, target Target, statsChan chan Stats)
 }
 
 // Returns a source func that net.Listen()'s and accepts conns.
-func MakeListenSourceFunc(source Source) func(string, Params, []chan []Request, chan Stats) {
-	return func(sourceSpec string, params Params, targetChans []chan []Request, statsChan chan Stats) {
+func MakeListenSourceFunc(source Source) func(string, Params, Target, chan Stats) {
+	return func(sourceSpec string, params Params, target Target, statsChan chan Stats) {
 		sourceParts := strings.Split(sourceSpec, ":")
 		if len(sourceParts) == 3 {
 			listen := strings.Join(sourceParts[1:], ":")
@@ -47,7 +51,7 @@ func MakeListenSourceFunc(source Source) func(string, Params, []chan []Request, 
 			} else {
 				defer ls.Close()
 				log.Printf("listening to: %s", listen)
-				AcceptConns(ls, params.SourceMaxConns, source, targetChans, statsChan)
+				AcceptConns(ls, params.SourceMaxConns, source, target, statsChan)
 			}
 		} else {
 			log.Fatalf("error: missing listen HOST:PORT; instead, got: %v",
@@ -59,7 +63,7 @@ func MakeListenSourceFunc(source Source) func(string, Params, []chan []Request, 
 // Accepts a max number of concurrent net.Conn's, starting a new
 // goroutine for each accepted net.Conn.
 func AcceptConns(ls net.Listener, maxConns int,
-	source Source, targetChans []chan []Request, statsChan chan Stats) {
+	source Source, target Target, statsChan chan Stats) {
 	log.Printf("accepting max conns: %d", maxConns)
 
 	chanAccepted := make(chan io.ReadWriteCloser)
@@ -94,9 +98,7 @@ func AcceptConns(ls net.Listener, maxConns int,
 				totConns++
 
 				go func(s io.ReadWriteCloser) {
-					source.Run(s, totConns,
-						targetChans[totConns%uint32(len(targetChans))],
-						statsChan)
+					source.Run(s, totConns, target, statsChan)
 					chanClosed <- s
 					s.Close()
 				}(c)

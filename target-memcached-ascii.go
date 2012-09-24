@@ -192,56 +192,74 @@ func AsciiTargetReadLines(br *bufio.Reader, req Request) (int, []string, error) 
 	return numValues, nil, fmt.Errorf("error: unreachable was reached")
 }
 
-func MemcachedAsciiTargetRun(spec string, params Params, incoming chan []Request,
-	statsChan chan Stats) {
+type MemcachedAsciiTarget struct {
+	incoming chan []Request
+}
+
+func (s MemcachedAsciiTarget) PickChannel(clientNum uint32, bucket string,
+	cmd string, key string) chan []Request {
+	return s.incoming
+}
+
+func MemcachedAsciiTargetRun(spec string, params Params,
+	statsChan chan Stats) Target {
 	spec = strings.Replace(spec, "memcached-ascii:", "", 1)
 
 	conn, err := net.Dial("tcp", spec)
 	if err != nil {
 		log.Fatalf("error: memcached-ascii connect failed: %s; err: %v", spec, err)
 	}
-	br := bufio.NewReader(conn)
-	bw := bufio.NewWriter(conn)
 
-	for reqs := range incoming {
-		reset := false
-		for _, req := range reqs {
-			if h, ok := AsciiTargetHandlers[req.Req.Opcode]; ok && !reset {
-				err := h.Write(br, bw, req)
-				if err != nil {
-					reset = true
+	s := MemcachedAsciiTarget{
+		incoming: make(chan []Request, params.TargetChanSize),
+	}
+
+	go func() {
+		br := bufio.NewReader(conn)
+		bw := bufio.NewWriter(conn)
+
+		for reqs := range s.incoming {
+			reset := false
+			for _, req := range reqs {
+				if h, ok := AsciiTargetHandlers[req.Req.Opcode]; ok && !reset {
+					err := h.Write(br, bw, req)
+					if err != nil {
+						reset = true
+					}
 				}
 			}
-		}
-		bw.Flush()
-		for _, req := range reqs {
-			if h, ok := AsciiTargetHandlers[req.Req.Opcode]; ok && !reset {
-				err := h.Read(br, bw, req)
-				if err != nil {
+			bw.Flush()
+			for _, req := range reqs {
+				if h, ok := AsciiTargetHandlers[req.Req.Opcode]; ok && !reset {
+					err := h.Read(br, bw, req)
+					if err != nil {
+						req.Res <- &gomemcached.MCResponse{
+							Opcode: req.Req.Opcode,
+							Status: gomemcached.EINVAL,
+							Opaque: req.Req.Opaque,
+						}
+						reset = true
+					}
+				} else {
 					req.Res <- &gomemcached.MCResponse{
 						Opcode: req.Req.Opcode,
-						Status: gomemcached.EINVAL,
+						Status: gomemcached.UNKNOWN_COMMAND,
 						Opaque: req.Req.Opaque,
 					}
-					reset = true
-				}
-			} else {
-				req.Res <- &gomemcached.MCResponse{
-					Opcode: req.Req.Opcode,
-					Status: gomemcached.UNKNOWN_COMMAND,
-					Opaque: req.Req.Opaque,
 				}
 			}
-		}
 
-		if reset {
-			log.Printf("warn: memcached-ascii closing conn; saw error: %v", err)
-			conn.Close()
-			conn = Reconnect(spec, func(spec string) (interface{}, error) {
-				return net.Dial("tcp", spec)
-			}).(net.Conn)
-			br = bufio.NewReader(conn)
-			bw = bufio.NewWriter(conn)
+			if reset {
+				log.Printf("warn: memcached-ascii closing conn; saw error: %v", err)
+				conn.Close()
+				conn = Reconnect(spec, func(spec string) (interface{}, error) {
+					return net.Dial("tcp", spec)
+				}).(net.Conn)
+				br = bufio.NewReader(conn)
+				bw = bufio.NewWriter(conn)
+			}
 		}
-	}
+	}()
+
+	return s
 }

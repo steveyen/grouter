@@ -11,8 +11,8 @@ import (
 
 type EndPoint struct {
 	Usage string // Help string.
-	StartSource func(string, grouter.Params, []chan []grouter.Request, chan grouter.Stats)
-	StartTarget func(string, grouter.Params, chan []grouter.Request, chan grouter.Stats)
+	StartSource func(string, grouter.Params, grouter.Target, chan grouter.Stats)
+	StartTarget func(string, grouter.Params, chan grouter.Stats) grouter.Target
 	MaxConcurrency int // Some end-points have limited concurrency.
 }
 
@@ -96,12 +96,12 @@ func main() {
 
 func MainStart(params grouter.Params) {
 	sourceKind := strings.Split(params.SourceSpec, ":")[0]
-	if source, ok := Sources[sourceKind]; ok {
+	if sourceDef, ok := Sources[sourceKind]; ok {
 		targetKind := strings.Split(params.TargetSpec, ":")[0]
-		if target, ok := Targets[targetKind]; ok {
-			if (target.MaxConcurrency > 0 &&
-				target.MaxConcurrency < params.TargetConcurrency) {
-				params.TargetConcurrency = target.MaxConcurrency
+		if targetDef, ok := Targets[targetKind]; ok {
+			if (targetDef.MaxConcurrency > 0 &&
+				targetDef.MaxConcurrency < params.TargetConcurrency) {
+				params.TargetConcurrency = targetDef.MaxConcurrency
 				log.Printf("    target-concurrency clipped to: %v;" +
 					" due to limitations of target kind: %v",
 					params.TargetConcurrency, targetKind)
@@ -110,13 +110,21 @@ func MainStart(params grouter.Params) {
 			statsChan := grouter.StartStatsReporter(
 				params.SourceMaxConns + params.TargetConcurrency)
 
+			target := targetDef.StartTarget(params.TargetSpec, params, statsChan)
+
+			sourceDef.StartSource(params.SourceSpec, params, target, statsChan)
+
+			// --------------------
+			/*
 			targetChans := make([]chan []grouter.Request, params.TargetConcurrency)
 			for i := range(targetChans) {
 				targetChans[i] = make(chan []grouter.Request, params.TargetChanSize)
 				StartTarget(target, targetChans[i], params, statsChan)
 			}
 
-			source.StartSource(params.SourceSpec, params, targetChans, statsChan)
+			sourceDef.StartSource(params.SourceSpec, params, targetChans, statsChan)
+			 */
+			// --------------------
 		} else {
 			log.Fatalf("error: unknown target kind: %s", params.TargetSpec)
 		}
@@ -125,6 +133,7 @@ func MainStart(params grouter.Params) {
 	}
 }
 
+/*
 func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
 	params grouter.Params, statsChan chan grouter.Stats) {
 	batched := make(chan []grouter.Request, params.TargetChanSize)
@@ -135,6 +144,7 @@ func StartTarget(target EndPoint, unbatched chan[]grouter.Request,
 		target.StartTarget(params.TargetSpec, params, batched, statsChan)
 	}()
 }
+*/
 
 func EndPointExamples(m map[string]EndPoint) (rv string) {
 	mk := make([]string, len(m))

@@ -9,6 +9,7 @@ import (
 type MemoryStorage struct {
 	data map[string]gomemcached.MCItem
 	cas  uint64
+	incoming chan []Request
 }
 
 type MemoryStorageHandler func(s *MemoryStorage, req Request)
@@ -63,21 +64,33 @@ var MemoryStorageHandlers = map[gomemcached.CommandCode]MemoryStorageHandler{
 	},
 }
 
-func MemoryStorageRun(spec string, params Params, incoming chan []Request,
-	statsChan chan Stats) {
-	s := MemoryStorage{data: make(map[string]gomemcached.MCItem)}
-	for {
-		reqs := <-incoming
-		for _, req := range reqs {
-			if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
-				h(&s, req)
-			} else {
-				req.Res <- &gomemcached.MCResponse{
-					Opcode: req.Req.Opcode,
-					Status: gomemcached.UNKNOWN_COMMAND,
-					Opaque: req.Req.Opaque,
+func (s MemoryStorage) PickChannel(clientNum uint32, bucket string,
+	cmd string, key string) chan []Request {
+	return s.incoming
+}
+
+func MemoryStorageRun(spec string, params Params, statsChan chan Stats) Target {
+	s := MemoryStorage{
+		data: make(map[string]gomemcached.MCItem),
+		incoming: make(chan []Request, params.TargetChanSize),
+	}
+
+	go func() {
+		for {
+			reqs := <-s.incoming
+			for _, req := range reqs {
+				if h, ok := MemoryStorageHandlers[req.Req.Opcode]; ok {
+					h(&s, req)
+				} else {
+					req.Res <- &gomemcached.MCResponse{
+						Opcode: req.Req.Opcode,
+						Status: gomemcached.UNKNOWN_COMMAND,
+						Opaque: req.Req.Opaque,
+					}
 				}
 			}
 		}
-	}
+	}()
+
+	return s
 }

@@ -6,16 +6,15 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-func WorkLoad(sourceSpec string, params Params, targetChans []chan []Request,
-	statsChan chan Stats) {
-	for i := 1; i < params.TargetConcurrency; i++ {
-		go run(i, sourceSpec, targetChans[i%len(targetChans)], statsChan)
+func WorkLoad(sourceSpec string, params Params, target Target, statsChan chan Stats) {
+	for i := 0; i < params.TargetConcurrency; i++ {
+		go run(uint32(i), sourceSpec, target, statsChan)
 	}
-	run(0, sourceSpec, targetChans[0], statsChan)
+	run(uint32(0), sourceSpec, target, statsChan)
 }
 
-func run(clientNum int, sourceSpec string, targetChan chan []Request,
-	statsChan chan Stats) {
+func run(clientNum uint32, sourceSpec string, target Target, statsChan chan Stats) {
+	bucket := "default"
 	report_every := 1000
 	ops_per_round := 100
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
@@ -25,7 +24,7 @@ func run(clientNum int, sourceSpec string, targetChan chan []Request,
 		reqs := make([]Request, ops_per_round)
 		for i := 0; i < ops_per_round; i++ {
 			reqs[i] = Request{
-				Bucket: "default",
+				Bucket: bucket,
 				Req: &gomemcached.MCRequest{
 					Opcode: gomemcached.GET,
 					Key:    []byte("hello"),
@@ -35,6 +34,7 @@ func run(clientNum int, sourceSpec string, targetChan chan []Request,
 			}
 		}
 		reqs_start := time.Now()
+		targetChan := target.PickChannel(clientNum, bucket, "", "")
 		targetChan <- reqs
 		for i := 0; i < ops_per_round; i++ {
 			<-res

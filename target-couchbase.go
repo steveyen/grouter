@@ -22,8 +22,7 @@ var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler
 	},
 }
 
-func CouchbaseTargetRun(spec string, params Params, incoming chan []Request,
-	statsChan chan Stats) {
+func CouchbaseTargetRun(spec string, params Params, statsChan chan Stats) Target {
 	specHTTP := strings.Replace(spec, "couchbase:", "http:", 1)
 
 	client, err := couchbase.Connect(specHTTP)
@@ -35,6 +34,8 @@ func CouchbaseTargetRun(spec string, params Params, incoming chan []Request,
 	if err != nil {
 		log.Fatalf("error: no default pool; err: %v", err)
 	}
+
+	incoming := make(chan []Request, params.TargetChanSize)
 
 	for {
 		reqs := <-incoming
@@ -60,4 +61,6 @@ func CouchbaseTargetRun(spec string, params Params, incoming chan []Request,
 			}
 		}
 	}
+
+	return nil // TODO.
 }
