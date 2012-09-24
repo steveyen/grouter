@@ -33,7 +33,7 @@ func MemcachedBinaryTargetStart(spec string, params Params,
 			BatchRequests(params.TargetChanSize,
 				s.incomingChans[i], incomingBatched, statsChan)
 		}()
-		MemcachedBinaryTargetStartIncoming(s, s.incomingBatched)
+		MemcachedBinaryTargetStartIncoming(s, incomingBatched)
 	}
 
 	return s
