@@ -12,7 +12,8 @@ type Stats struct {
 }
 
 func StartStatsReporter(chanSize int) chan Stats {
-	reportChan := time.Tick(2 * time.Second)
+	reportSecs := 2 * time.Second
+	reportChan := time.Tick(reportSecs)
 	statsChan := make(chan Stats, chanSize)
 	curr := make(map[string]int64)
 	prev := make(map[string]int64)
@@ -27,7 +28,7 @@ func StartStatsReporter(chanSize int) chan Stats {
 				}
 			case <-reportChan:
 				full := i%10 == 0
-				if StatsReport(curr, prev, full) && full {
+				if StatsReport(curr, prev, reportSecs, full) && full {
 					log.Printf("-------------")
 				}
 				for k, v := range curr {
@@ -41,7 +42,8 @@ func StartStatsReporter(chanSize int) chan Stats {
 	return statsChan
 }
 
-func StatsReport(curr map[string]int64, prev map[string]int64, full bool) bool {
+func StatsReport(curr map[string]int64, prev map[string]int64,
+	reportSecs time.Duration, full bool) bool {
 	// Reports rates on paired stats that follow a naming convention
 	// like xxx and xxx_usecs.  For example, tot_ops and tot_ops_usecs.
 	emitted := false
@@ -49,17 +51,14 @@ func StatsReport(curr map[string]int64, prev map[string]int64, full bool) bool {
 		if strings.HasSuffix(k, "_usecs") {
 			continue
 		}
-		k_usecs := k + "_usecs"
-		v_usecs := curr[k_usecs]
-		if v_usecs > prev[k_usecs] {
-			k_per_usec := float64(v-prev[k]) / float64(v_usecs-prev[k_usecs])
-			if k_per_usec > 0 {
+		if strings.HasPrefix(k, "tot_") {
+			k_per_sec := float64(v-prev[k]) / reportSecs.Seconds()
+			if k_per_sec > 0 {
 				if full {
-					log.Printf(" %v: %v, per sec: %f",
-						k, v, k_per_usec*1000000.0)
+					log.Printf(" %v: %v, per sec: %f", k, v, k_per_sec)
 					emitted = true
 				} else {
-					log.Printf(" %v per sec: %f", k, k_per_usec*1000000.0)
+					log.Printf(" %v per sec: %f", k, k_per_sec)
 					emitted = true
 				}
 				continue
