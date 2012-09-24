@@ -52,14 +52,26 @@ func StatsReport(curr map[string]int64, prev map[string]int64,
 			continue
 		}
 		if strings.HasPrefix(k, "tot_") {
-			k_per_sec := float64(v-prev[k]) / reportSecs.Seconds()
+			v_diff := v - prev[k]
+			k_per_sec := float64(v_diff) / reportSecs.Seconds()
 			if k_per_sec > 0 {
 				if full {
 					log.Printf("%v: %v, per sec: %f", k, v, k_per_sec)
 					emitted = true
 				} else {
-					log.Printf("%v per sec: %f", k, k_per_sec)
-					emitted = true
+					k_usecs := k + "_usecs"
+					curr_usecs := curr[k_usecs]
+					prev_usecs := prev[k_usecs]
+					diff_usecs := float64(curr_usecs - prev_usecs)
+					if diff_usecs > 0 {
+						log.Printf("%v per sec: %f, avg latency: %f",
+							k, k_per_sec,
+							(diff_usecs / 1000000.0) / float64(v_diff))
+						emitted = true
+					} else {
+						log.Printf("%v per sec: %f", k, k_per_sec)
+						emitted = true
+					}
 				}
 				continue
 			}
