@@ -22,7 +22,7 @@ func WorkLoad(clientNum uint32, sourceSpec string, target Target,
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0
 	res := make(chan *gomemcached.MCResponse)
-	res_map := make(map[uint32] *gomemcached.MCResponse) // Key is opaque uint32.
+	res_map := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
 	opaque := uint32(0)
 	for {
 		reqs := make([]Request, ops_per_round)
