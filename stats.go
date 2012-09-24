@@ -55,17 +55,17 @@ func StatsReport(curr map[string]int64, prev map[string]int64,
 			k_per_sec := float64(v-prev[k]) / reportSecs.Seconds()
 			if k_per_sec > 0 {
 				if full {
-					log.Printf(" %v: %v, per sec: %f", k, v, k_per_sec)
+					log.Printf("%v: %v, per sec: %f", k, v, k_per_sec)
 					emitted = true
 				} else {
-					log.Printf(" %v per sec: %f", k, k_per_sec)
+					log.Printf("%v per sec: %f", k, k_per_sec)
 					emitted = true
 				}
 				continue
 			}
 		}
 		if full && v != prev[k] {
-			log.Printf(" %v: %v", k, v)
+			log.Printf("%v: %v", k, v)
 			emitted = true
 		}
 	}
