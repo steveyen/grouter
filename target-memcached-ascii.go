@@ -193,31 +193,42 @@ func AsciiTargetReadLines(br *bufio.Reader, req Request) (int, []string, error) 
 }
 
 type MemcachedAsciiTarget struct {
-	incoming chan []Request
+	spec          string
+	incomingChans []chan []Request
 }
 
 func (s MemcachedAsciiTarget) PickChannel(clientNum uint32, bucket string) chan []Request {
-	return s.incoming
+	return s.incomingChans[clientNum%uint32(len(s.incomingChans))]
 }
 
 func MemcachedAsciiTargetRun(spec string, params Params,
 	statsChan chan Stats) Target {
 	spec = strings.Replace(spec, "memcached-ascii:", "", 1)
 
-	conn, err := net.Dial("tcp", spec)
-	if err != nil {
-		log.Fatalf("error: memcached-ascii connect failed: %s; err: %v", spec, err)
+	s := MemcachedAsciiTarget{
+		spec:          spec,
+		incomingChans: make([]chan []Request, params.TargetConcurrency),
 	}
 
-	s := MemcachedAsciiTarget{
-		incoming: make(chan []Request, params.TargetChanSize),
+	for i := range s.incomingChans {
+		s.incomingChans[i] = make(chan []Request, params.TargetChanSize)
+		MemcachedAsciiTargetRunIncoming(s, s.incomingChans[i])
+	}
+
+	return s
+}
+
+func MemcachedAsciiTargetRunIncoming(s MemcachedAsciiTarget, incoming chan []Request) {
+	conn, err := net.Dial("tcp", s.spec)
+	if err != nil {
+		log.Fatalf("error: memcached-ascii connect failed: %s; err: %v", s.spec, err)
 	}
 
 	go func() {
 		br := bufio.NewReader(conn)
 		bw := bufio.NewWriter(conn)
 
-		for reqs := range s.incoming {
+		for reqs := range incoming {
 			reset := false
 			for _, req := range reqs {
 				if h, ok := AsciiTargetHandlers[req.Req.Opcode]; ok && !reset {
@@ -251,7 +262,7 @@ func MemcachedAsciiTargetRun(spec string, params Params,
 			if reset {
 				log.Printf("warn: memcached-ascii closing conn; saw error: %v", err)
 				conn.Close()
-				conn = Reconnect(spec, func(spec string) (interface{}, error) {
+				conn = Reconnect(s.spec, func(spec string) (interface{}, error) {
 					return net.Dial("tcp", spec)
 				}).(net.Conn)
 				br = bufio.NewReader(conn)
@@ -259,6 +270,4 @@ func MemcachedAsciiTargetRun(spec string, params Params,
 			}
 		}
 	}()
-
-	return s
 }

@@ -25,7 +25,7 @@ func MemcachedBinaryTargetRun(spec string, params Params,
 		log.Fatalf("error: memcached-binary connect failed: %s; err: %v", spec, err)
 	}
 
-	s := MemcachedAsciiTarget{
+	s := MemcachedBinaryTarget{
 		incoming: make(chan []Request, params.TargetChanSize),
 	}
 
