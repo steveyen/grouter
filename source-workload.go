@@ -22,24 +22,37 @@ func WorkLoad(clientNum uint32, sourceSpec string, target Target,
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0
 	res := make(chan *gomemcached.MCResponse)
+	res_map := make(map[uint32] *gomemcached.MCResponse) // Key is opaque uint32.
+	opaque := uint32(0)
 	for {
 		reqs := make([]Request, ops_per_round)
+		opaque_start := opaque
 		for i := 0; i < ops_per_round; i++ {
 			reqs[i] = Request{
 				Bucket: bucket,
 				Req: &gomemcached.MCRequest{
 					Opcode: gomemcached.GET,
+					Opaque: opaque,
 					Key:    []byte("hello"),
 				},
 				Res:       res,
 				ClientNum: clientNum,
 			}
+			opaque++
 		}
 		reqs_start := time.Now()
 		targetChan := target.PickChannel(clientNum, bucket)
 		targetChan <- reqs
 		for i := 0; i < ops_per_round; i++ {
-			<-res
+			res_opaque := opaque_start + uint32(i)
+			if res_map[res_opaque] != nil {
+				delete(res_map, res_opaque)
+			} else {
+				mc_res := <-res
+				if mc_res.Opaque != res_opaque {
+					res_map[res_opaque] = mc_res
+				}
+			}
 		}
 		reqs_end := time.Now()
 
