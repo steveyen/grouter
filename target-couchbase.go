@@ -63,7 +63,7 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 		for reqs := range incoming {
 			for _, req := range reqs {
 				bucket, err := pool.GetBucket(req.Bucket)
-			if err != nil {
+				if err != nil {
 					log.Printf("warn: missing bucket: %s; err: %v", req.Bucket, err)
 					req.Res <- &gomemcached.MCResponse{
 						Opcode: req.Req.Opcode,
