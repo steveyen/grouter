@@ -57,19 +57,17 @@ func StatsReport(curr map[string]int64, prev map[string]int64,
 			if k_per_sec > 0 {
 				if full {
 					log.Printf("%v: %v, per sec: %f", k, v, k_per_sec)
-					emitted = true
 				} else {
 					k_usecs := k + "_usecs"
 					d_usecs := float64(curr[k_usecs] - prev[k_usecs])
 					if d_usecs > 0 {
 						log.Printf("%v per sec: %f, avg latency: %f",
 							k, k_per_sec, (d_usecs/1000000.0)/float64(v_diff))
-						emitted = true
 					} else {
 						log.Printf("%v per sec: %f", k, k_per_sec)
-						emitted = true
 					}
 				}
+				emitted = true
 				continue
 			}
 		}

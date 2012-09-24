@@ -168,6 +168,7 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 				Keys: []string{"tot_batch"},
 				Vals: []int64{tot_batch},
 			}
+			tot_batch = int64(0)
 		}
 	}
 }
