@@ -9,32 +9,43 @@ import (
 )
 
 type MemcachedBinaryTarget struct {
-	incoming chan []Request
+	spec          string
+	incomingChans []chan []Request
 }
 
 func (s MemcachedBinaryTarget) PickChannel(clientNum uint32, bucket string) chan []Request {
-	return s.incoming
+	return s.incomingChans[clientNum%uint32(len(s.incomingChans))]
 }
 
 func MemcachedBinaryTargetRun(spec string, params Params,
 	statsChan chan Stats) Target {
 	spec = strings.Replace(spec, "memcached-binary:", "", 1)
 
-	client, err := memcached.Connect("tcp", spec)
-	if err != nil {
-		log.Fatalf("error: memcached-binary connect failed: %s; err: %v", spec, err)
+	s := MemcachedBinaryTarget{
+		spec:          spec,
+		incomingChans: make([]chan []Request, params.TargetConcurrency),
 	}
 
-	s := MemcachedBinaryTarget{
-		incoming: make(chan []Request, params.TargetChanSize),
+	for i := range s.incomingChans {
+		s.incomingChans[i] = make(chan []Request, params.TargetChanSize)
+		MemcachedBinaryTargetRunIncoming(s, s.incomingChans[i])
+	}
+
+	return s
+}
+
+func MemcachedBinaryTargetRunIncoming(s MemcachedBinaryTarget, incoming chan []Request) {
+	client, err := memcached.Connect("tcp", s.spec)
+	if err != nil {
+		log.Fatalf("error: memcached-binary connect failed: %s; err: %v", s.spec, err)
 	}
 
 	go func() {
-		for reqs := range s.incoming {
+		for reqs := range incoming {
 			for _, req := range reqs {
-				log.Printf("sending.....: %s; err: %v", spec, err)
+				log.Printf("sending.....: %s; err: %v", s.spec, err)
 				res, err := client.Send(req.Req)
-				log.Printf("sending.done: %s; err: %v", spec, err)
+				log.Printf("sending.done: %s; err: %v", s.spec, err)
 				if err != nil {
 					req.Res <- &gomemcached.MCResponse{
 						Opcode: req.Req.Opcode,
@@ -43,7 +54,7 @@ func MemcachedBinaryTargetRun(spec string, params Params,
 					}
 					log.Printf("warn: memcached-binary closing conn; saw error: %v", err)
 					client.Close()
-					client = Reconnect(spec, func(spec string) (interface{}, error) {
+					client = Reconnect(s.spec, func(spec string) (interface{}, error) {
 						return memcached.Connect("tcp", spec)
 					}).(*memcached.Client)
 				} else {
@@ -52,6 +63,4 @@ func MemcachedBinaryTargetRun(spec string, params Params,
 			}
 		}
 	}()
-
-	return s
 }
