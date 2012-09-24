@@ -30,7 +30,7 @@ func run(clientNum uint32, sourceSpec string, target Target, statsChan chan Stat
 					Key:    []byte("hello"),
 				},
 				Res:       res,
-				ClientNum: uint32(clientNum),
+				ClientNum: clientNum,
 			}
 		}
 		reqs_start := time.Now()
