@@ -28,7 +28,12 @@ func MemcachedBinaryTargetStart(spec string, params Params,
 
 	for i := range s.incomingChans {
 		s.incomingChans[i] = make(chan []Request, params.TargetChanSize)
-		MemcachedBinaryTargetStartIncoming(s, s.incomingChans[i])
+		incomingBatched := make(chan []Request, params.TargetChanSize)
+		go func() {
+			BatchRequests(params.TargetChanSize,
+				s.incomingChans[i], incomingBatched, statsChan)
+		}()
+		MemcachedBinaryTargetStartIncoming(s, s.incomingBatched)
 	}
 
 	return s
