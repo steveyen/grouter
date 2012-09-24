@@ -8,6 +8,15 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
+type CouchbaseTarget struct {
+	spec          string
+	incomingChans []chan []Request
+}
+
+func (s CouchbaseTarget) PickChannel(clientNum uint32, bucket string) chan []Request {
+	return s.incomingChans[clientNum%uint32(len(s.incomingChans))]
+}
+
 type CouchbaseTargetHandler func(req Request, bucket *couchbase.Bucket)
 
 var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler{
@@ -22,12 +31,27 @@ var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler
 	},
 }
 
-func CouchbaseTargetRun(spec string, params Params, statsChan chan Stats) Target {
-	specHTTP := strings.Replace(spec, "couchbase:", "http:", 1)
+func CouchbaseTargetRun(spec string, params Params,
+	statsChan chan Stats) Target {
+	spec = strings.Replace(spec, "couchbase:", "http:", 1)
 
-	client, err := couchbase.Connect(specHTTP)
+	s := CouchbaseTarget{
+		spec:          spec,
+		incomingChans: make([]chan []Request, params.TargetConcurrency),
+	}
+
+	for i := range s.incomingChans {
+		s.incomingChans[i] = make(chan []Request, params.TargetChanSize)
+		CouchbaseTargetRunIncoming(s, s.incomingChans[i])
+	}
+
+	return s
+}
+
+func CouchbaseTargetRunIncoming(s CouchbaseTarget, incoming chan []Request) {
+	client, err := couchbase.Connect(s.spec)
 	if err != nil {
-		log.Fatalf("error: couchbase connect failed: %s; err: %v", specHTTP, err)
+		log.Fatalf("error: couchbase connect failed: %s; err: %v", s.spec, err)
 	}
 
 	pool, err := client.GetPool("default")
@@ -35,32 +59,29 @@ func CouchbaseTargetRun(spec string, params Params, statsChan chan Stats) Target
 		log.Fatalf("error: no default pool; err: %v", err)
 	}
 
-	incoming := make(chan []Request, params.TargetChanSize)
-
-	for {
-		reqs := <-incoming
-		for _, req := range reqs {
-			bucket, err := pool.GetBucket(req.Bucket)
+	go func() {
+		for reqs := range incoming {
+			for _, req := range reqs {
+				bucket, err := pool.GetBucket(req.Bucket)
 			if err != nil {
-				log.Printf("warn: missing bucket: %s; err: %v", req.Bucket, err)
-				req.Res <- &gomemcached.MCResponse{
-					Opcode: req.Req.Opcode,
-					Status: gomemcached.EINVAL,
-					Opaque: req.Req.Opaque,
-				}
-			} else {
-				if h, ok := CouchbaseTargetHandlers[req.Req.Opcode]; ok {
-					h(req, bucket)
-				} else {
+					log.Printf("warn: missing bucket: %s; err: %v", req.Bucket, err)
 					req.Res <- &gomemcached.MCResponse{
 						Opcode: req.Req.Opcode,
-						Status: gomemcached.UNKNOWN_COMMAND,
+						Status: gomemcached.EINVAL,
 						Opaque: req.Req.Opaque,
+					}
+				} else {
+					if h, ok := CouchbaseTargetHandlers[req.Req.Opcode]; ok {
+						h(req, bucket)
+					} else {
+						req.Res <- &gomemcached.MCResponse{
+							Opcode: req.Req.Opcode,
+							Status: gomemcached.UNKNOWN_COMMAND,
+							Opaque: req.Req.Opaque,
+						}
 					}
 				}
 			}
 		}
-	}
-
-	return nil // TODO.
+	}()
 }
