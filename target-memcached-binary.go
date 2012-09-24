@@ -17,7 +17,7 @@ func (s MemcachedBinaryTarget) PickChannel(clientNum uint32, bucket string) chan
 	return s.incomingChans[clientNum%uint32(len(s.incomingChans))]
 }
 
-func MemcachedBinaryTargetRun(spec string, params Params,
+func MemcachedBinaryTargetStart(spec string, params Params,
 	statsChan chan Stats) Target {
 	spec = strings.Replace(spec, "memcached-binary:", "", 1)
 
@@ -28,13 +28,13 @@ func MemcachedBinaryTargetRun(spec string, params Params,
 
 	for i := range s.incomingChans {
 		s.incomingChans[i] = make(chan []Request, params.TargetChanSize)
-		MemcachedBinaryTargetRunIncoming(s, s.incomingChans[i])
+		MemcachedBinaryTargetStartIncoming(s, s.incomingChans[i])
 	}
 
 	return s
 }
 
-func MemcachedBinaryTargetRunIncoming(s MemcachedBinaryTarget, incoming chan []Request) {
+func MemcachedBinaryTargetStartIncoming(s MemcachedBinaryTarget, incoming chan []Request) {
 	client, err := memcached.Connect("tcp", s.spec)
 	if err != nil {
 		log.Fatalf("error: memcached-binary connect failed: %s; err: %v", s.spec, err)

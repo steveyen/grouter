@@ -6,15 +6,15 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-func WorkLoad(sourceSpec string, params Params, target Target,
+func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
 	for i := 1; i < params.TargetConcurrency; i++ {
-		go WorkLoadRun(uint32(i), sourceSpec, target, statsChan)
+		go WorkLoad(uint32(i), sourceSpec, target, statsChan)
 	}
-	WorkLoadRun(uint32(0), sourceSpec, target, statsChan)
+	WorkLoad(uint32(0), sourceSpec, target, statsChan)
 }
 
-func WorkLoadRun(clientNum uint32, sourceSpec string, target Target,
+func WorkLoad(clientNum uint32, sourceSpec string, target Target,
 	statsChan chan Stats) {
 	bucket := "default"
 	report_every := 1000

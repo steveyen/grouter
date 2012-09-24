@@ -68,7 +68,7 @@ func (s MemoryStorage) PickChannel(clientNum uint32, bucket string) chan []Reque
 	return s.incoming
 }
 
-func MemoryStorageRun(spec string, params Params, statsChan chan Stats) Target {
+func MemoryStorageStart(spec string, params Params, statsChan chan Stats) Target {
 	s := MemoryStorage{
 		data:     make(map[string]gomemcached.MCItem),
 		incoming: make(chan []Request, params.TargetChanSize),

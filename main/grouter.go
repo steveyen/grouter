@@ -11,7 +11,7 @@ import (
 
 type EndPoint struct {
 	Usage string // Help string.
-	StartSource func(string, grouter.Params, grouter.Target, chan grouter.Stats)
+	RunSource func(string, grouter.Params, grouter.Target, chan grouter.Stats)
 	StartTarget func(string, grouter.Params, chan grouter.Stats) grouter.Target
 	MaxConcurrency int // Some end-points have limited concurrency.
 }
@@ -20,15 +20,15 @@ type EndPoint struct {
 var Sources = map[string]EndPoint{
 	"memcached": EndPoint{
 		Usage: "memcached:LISTEN_INTERFACE:LISTEN_PORT",
-		StartSource: grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
+		RunSource: grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
 	},
 	"memcached-ascii": EndPoint{
 		Usage: "memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT",
-		StartSource: grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
+		RunSource: grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
 	},
 	"workload": EndPoint{
 		Usage: "workload",
-		StartSource: grouter.WorkLoad,
+		RunSource: grouter.WorkLoadRun,
 	},
 }
 
@@ -36,23 +36,23 @@ var Sources = map[string]EndPoint{
 var Targets = map[string]EndPoint{
 	"http": EndPoint{
 		Usage: "http://COUCHBASE_HOST:COUCHBASE_PORT",
-        StartTarget: grouter.CouchbaseTargetRun,
+        StartTarget: grouter.CouchbaseTargetStart,
 	},
 	"couchbase": EndPoint{
 		Usage: "couchbase://COUCHBASE_HOST:COUCHBASE_PORT",
-        StartTarget: grouter.CouchbaseTargetRun,
+        StartTarget: grouter.CouchbaseTargetStart,
 	},
 	"memcached-ascii": EndPoint{
 		Usage: "memcached-ascii:HOST:PORT",
-		StartTarget: grouter.MemcachedAsciiTargetRun,
+		StartTarget: grouter.MemcachedAsciiTargetStart,
 	},
 	"memcached-binary": EndPoint{
 		Usage: "memcached-binary:HOST:PORT",
-		StartTarget: grouter.MemcachedBinaryTargetRun,
+		StartTarget: grouter.MemcachedBinaryTargetStart,
 	},
 	"memory": EndPoint{
 		Usage: "memory",
-		StartTarget: grouter.MemoryStorageRun,
+		StartTarget: grouter.MemoryStorageStart,
 		MaxConcurrency: 1,
 	},
 }
@@ -112,7 +112,7 @@ func MainStart(params grouter.Params) {
 
 			target := targetDef.StartTarget(params.TargetSpec, params, statsChan)
 
-			sourceDef.StartSource(params.SourceSpec, params, target, statsChan)
+			sourceDef.RunSource(params.SourceSpec, params, target, statsChan)
 
 			// --------------------
 			/*

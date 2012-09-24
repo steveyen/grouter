@@ -31,7 +31,7 @@ var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler
 	},
 }
 
-func CouchbaseTargetRun(spec string, params Params,
+func CouchbaseTargetStart(spec string, params Params,
 	statsChan chan Stats) Target {
 	spec = strings.Replace(spec, "couchbase:", "http:", 1)
 
@@ -42,13 +42,13 @@ func CouchbaseTargetRun(spec string, params Params,
 
 	for i := range s.incomingChans {
 		s.incomingChans[i] = make(chan []Request, params.TargetChanSize)
-		CouchbaseTargetRunIncoming(s, s.incomingChans[i])
+		CouchbaseTargetStartIncoming(s, s.incomingChans[i])
 	}
 
 	return s
 }
 
-func CouchbaseTargetRunIncoming(s CouchbaseTarget, incoming chan []Request) {
+func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 	client, err := couchbase.Connect(s.spec)
 	if err != nil {
 		log.Fatalf("error: couchbase connect failed: %s; err: %v", s.spec, err)

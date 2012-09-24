@@ -201,7 +201,7 @@ func (s MemcachedAsciiTarget) PickChannel(clientNum uint32, bucket string) chan 
 	return s.incomingChans[clientNum%uint32(len(s.incomingChans))]
 }
 
-func MemcachedAsciiTargetRun(spec string, params Params,
+func MemcachedAsciiTargetStart(spec string, params Params,
 	statsChan chan Stats) Target {
 	spec = strings.Replace(spec, "memcached-ascii:", "", 1)
 
@@ -212,13 +212,13 @@ func MemcachedAsciiTargetRun(spec string, params Params,
 
 	for i := range s.incomingChans {
 		s.incomingChans[i] = make(chan []Request, params.TargetChanSize)
-		MemcachedAsciiTargetRunIncoming(s, s.incomingChans[i])
+		MemcachedAsciiTargetStartIncoming(s, s.incomingChans[i])
 	}
 
 	return s
 }
 
-func MemcachedAsciiTargetRunIncoming(s MemcachedAsciiTarget, incoming chan []Request) {
+func MemcachedAsciiTargetStartIncoming(s MemcachedAsciiTarget, incoming chan []Request) {
 	conn, err := net.Dial("tcp", s.spec)
 	if err != nil {
 		log.Fatalf("error: memcached-ascii connect failed: %s; err: %v", s.spec, err)
