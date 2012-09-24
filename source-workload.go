@@ -7,7 +7,7 @@ import (
 )
 
 func WorkLoad(sourceSpec string, params Params, target Target, statsChan chan Stats) {
-	for i := 0; i < params.TargetConcurrency; i++ {
+	for i := 1; i < params.TargetConcurrency; i++ {
 		go run(uint32(i), sourceSpec, target, statsChan)
 	}
 	run(uint32(0), sourceSpec, target, statsChan)
