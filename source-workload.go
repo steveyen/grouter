@@ -44,12 +44,16 @@ func WorkLoad(clientNum uint32, sourceSpec string, target Target,
 		targetChan := target.PickChannel(clientNum, bucket)
 		targetChan <- reqs
 		for i := 0; i < ops_per_round; i++ {
+			// The responses might be out of order, where we use the
+			// opaque field to sequence the responses.  We have a
+			// res_map to stash early responses until needed.
 			res_opaque := opaque_start + uint32(i)
 			if res_map[res_opaque] != nil {
 				delete(res_map, res_opaque)
 			} else {
 				mc_res := <-res
 				if mc_res.Opaque != res_opaque {
+					// TODO: assert(res_map[res_opaque] == nil)
 					res_map[res_opaque] = mc_res
 				}
 			}
