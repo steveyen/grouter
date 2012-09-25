@@ -58,6 +58,7 @@ func WorkLoad(clientNum uint32, sourceSpec string, target Target,
 				}
 			}
 		}
+		// TODO: assert(len(res_map) == 0)
 		reqs_end := time.Now()
 
 		tot_workload_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
