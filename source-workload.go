@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,7 +80,7 @@ func WorkLoad(clientNum uint32, sourceSpec string, target Target,
 				Req: &gomemcached.MCRequest{
 					Opcode: gomemcached.GET,
 					Opaque: opaque,
-					Key:    []byte("hello"),
+					Key:    []byte(strconv.FormatInt(int64(i), 10)),
 				},
 				Res:       res,
 				ClientNum: clientNum,
