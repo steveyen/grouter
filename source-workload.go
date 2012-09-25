@@ -35,7 +35,6 @@ func ReadJSONFile(path string) interface{} {
 	if err != nil {
 		log.Fatalf("error: could not read: %v; err: %v", path, err)
 	}
-
 	var data interface{}
 	err = json.Unmarshal(bytes, &data)
 	if err != nil {
