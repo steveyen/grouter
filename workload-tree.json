@@ -1,48 +1,20 @@
-{
-  "ratio-mutation/read": {
-    "ratio-create/update": [
-      "new-create"
-    ],
-    "else": {
-      "ratio-delete/set": {
-        "ratio-hot-delete/cold-delete": [
-          "hot-delete"
-        ],
-        "else": [
-          "cold-delete"
-        ]
-      },
-      "else": {
-        "ratio-hot-set/cold-set": [
-          "hot-set"
-        ],
-        "else": [
-          "cold-set"
-        ]
-      }
-    }
-  },
-  "else": {
-    "ratio-query/primary-key": {
-      "ratio-hot-query/cold-query": [
-        "hot-query"
-      ],
-      "else": [
-        "cold-query"
-      ]
-    },
-    "else": {
-      "ratio-miss-get/hit-get": [
-        "miss-get"
-      ],
-      "else": {
-        "ratio-hot-get/cold-get": [
-          "hot-get"
-        ],
-        "else": [
-          "cold-get"
-        ]
-      }
-    }
-  }
-}
+[ "ratio:mutation/read",
+  [ "ratio:create/update",
+    [ "do:new-create" ],
+    [ "ratio:delete/set",
+      [ "ratio:hot-delete/cold-delete",
+        [ "do:hot-delete" ],
+        [ "do:cold-delete" ] ],
+      [ "ratio:hot-set/cold-set",
+        [ "do:hot-set" ],
+        [ "do:cold-set" ] ] ] ],
+  [ "ratio:query/primary-key",
+    [ "ratio:hot-query/cold-query",
+      [ "do:hot-query" ],
+      [ "do:cold-query" ] ],
+    [ "ratio:miss-get/hit-get",
+      [ "do:miss-get" ],
+      [ "ratio:hot-get/cold-get",
+        [ "do:hot-get" ],
+        [ "do:cold-get" ] ] ] ] ]
+
