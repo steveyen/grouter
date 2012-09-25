@@ -1,6 +1,9 @@
 package grouter
 
 import (
+	"encoding/json"
+	"io/ioutil"
+	"log"
 	"time"
 
 	"github.com/dustin/gomemcached"
@@ -8,10 +11,37 @@ import (
 
 func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
+	cfg, cfg_tree := WorkLoadCfg("./workload.json")
+	log.Printf("%v", cfg)
+	log.Printf("%v", cfg_tree)
+
 	for i := 1; i < params.TargetConcurrency; i++ {
 		go WorkLoad(uint32(i), sourceSpec, target, statsChan)
 	}
 	WorkLoad(uint32(0), sourceSpec, target, statsChan)
+}
+
+func WorkLoadCfg(cfg_path string) (map[string]interface{}, []interface{}) {
+	cfg := ReadJSONFile(cfg_path).(map[string]interface{})
+	if cfg["tree"] == nil {
+		log.Fatalf("error: missing decision 'tree' attribute from: %v", cfg_path)
+	}
+	cfg_tree := ReadJSONFile(cfg["tree"].(string)).([]interface{})
+	return cfg, cfg_tree
+}
+
+func ReadJSONFile(path string) interface{} {
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatalf("error: could not read: %v; err: %v", path, err)
+	}
+
+	var data interface{}
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		log.Fatalf("error: could not parse json from: %v; err: %v", path, err)
+	}
+	return data
 }
 
 func WorkLoad(clientNum uint32, sourceSpec string, target Target,
