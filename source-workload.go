@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/dustin/gomemcached"
@@ -11,8 +13,23 @@ import (
 
 func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
-	cfg, cfg_tree := WorkLoadCfg("./workload.json")
-	log.Printf("%v", cfg)
+	cfg_path := "./workload.json"
+	log.Printf("  cfg_path: %v", cfg_path)
+	cfg, cfg_tree := WorkLoadCfg(cfg_path)
+
+	cfg_keys := make([]string, 0, len(cfg))
+	for k := range cfg {
+		if !strings.HasSuffix(k, "-") {
+			cfg_keys = append(cfg_keys, k)
+		}
+	}
+	sort.Strings(cfg_keys)
+	for _, k := range cfg_keys {
+		if !strings.HasSuffix(k, "-") {
+			log.Printf("    %v: %v - %v", k, cfg[k], cfg[k+"-"])
+		}
+	}
+
 	log.Printf("%v", cfg_tree)
 
 	for i := 1; i < params.TargetConcurrency; i++ {
