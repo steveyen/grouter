@@ -14,7 +14,8 @@ import (
 
 type WorkLoadCfg struct {
 	cfg      map[string]interface{} // Key-value map (see workload.json).
-	cfg_tree []interface{}          // Decision tree (see workload-tree.json).
+	ops_tree []interface{}          // Ops generation decision tree
+									// (see workload-tree.json).
 }
 
 // The source entry function for synthetic workload generation.
@@ -40,7 +41,7 @@ func WorkLoadCfgRead(cfg_path string) WorkLoadCfg {
 	}
 	return WorkLoadCfg{
 		cfg:      cfg,
-		cfg_tree: ReadJSONFile(cfg["tree"].(string)).([]interface{}),
+		ops_tree: ReadJSONFile(cfg["tree"].(string)).([]interface{}),
 	}
 }
 
