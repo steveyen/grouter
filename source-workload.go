@@ -127,9 +127,11 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 	}
 }
 
-// Helper function that generates workload requests onto a reqs_gen channel.
+// Helper function that generates a batch of workload requests onto a
+// reqs_gen channel.
 func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
-	bucket string, batch int, reqs_gen chan []Request, res chan *gomemcached.MCResponse) {
+	bucket string, batch int, reqs_gen chan []Request,
+	res chan *gomemcached.MCResponse) {
 	opaque := uint32(0)
 	for {
 		reqs := make([]Request, batch)
