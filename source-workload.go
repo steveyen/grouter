@@ -65,35 +65,18 @@ func WorkLoadCfgGetInt(cfg WorkLoadCfg, key string, defaultVal int) int {
 
 func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Target,
 	statsChan chan Stats) {
-	bucket := "default"
 	report := 100
+	bucket := "default"
 	batch := WorkLoadCfgGetInt(cfg, "batch", 100)
+
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0
-	reqs_gen := make(chan []Request)
-	res_map := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
-	res := make(chan *gomemcached.MCResponse, batch)
 
-	go func() {
-		opaque := uint32(0)
-		for {
-			reqs := make([]Request, batch)
-			for i := 0; i < batch; i++ {
-				reqs[i] = Request{
-					Bucket: bucket,
-					Req: &gomemcached.MCRequest{
-						Opcode: gomemcached.GET,
-						Opaque: opaque,
-						Key:    []byte(strconv.FormatInt(int64(i), 10)),
-					},
-					Res:       res,
-					ClientNum: clientNum,
-				}
-				opaque++
-			}
-			reqs_gen <- reqs
-		}
-	}()
+	res := make(chan *gomemcached.MCResponse, batch)
+	res_map := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
+	reqs_gen := make(chan []Request)
+
+	go WorkLoadBatchRun(cfg, clientNum, sourceSpec, bucket, batch, reqs_gen, res)
 
 	for {
 		reqs := <-reqs_gen
@@ -134,6 +117,28 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 			tot_workload_ops_nsecs = int64(0)
 			tot_workload_ops = 0
 		}
+	}
+}
+
+func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
+	bucket string, batch int, reqs_gen chan []Request, res chan *gomemcached.MCResponse) {
+	opaque := uint32(0)
+	for {
+		reqs := make([]Request, batch)
+		for i := 0; i < batch; i++ {
+			reqs[i] = Request{
+				Bucket: bucket,
+				Req: &gomemcached.MCRequest{
+					Opcode: gomemcached.GET,
+					Opaque: opaque,
+					Key:    []byte(strconv.FormatInt(int64(i), 10)),
+				},
+				Res:       res,
+				ClientNum: clientNum,
+			}
+			opaque++
+		}
+		reqs_gen <- reqs
 	}
 }
 
