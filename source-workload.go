@@ -66,7 +66,7 @@ func WorkLoadCfgGetInt(cfg WorkLoadCfg, key string, defaultVal int) int {
 func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Target,
 	statsChan chan Stats) {
 	bucket := "default"
-	report := WorkLoadCfgGetInt(cfg, "report", 40000)
+	report := 100
 	ops_per_round := WorkLoadCfgGetInt(cfg, "batch", 100)
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0

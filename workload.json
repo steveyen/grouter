@@ -63,8 +63,6 @@
     "ratio-expirations-": "Fraction of creates and sets with an expiration",
     "ratio-hot": 0.2,
     "ratio-hot-": "Fraction of items to have as a hot item subset",
-    "report": 40000,
-    "report-": "Emit performance output after this many ops",
     "socket-timeout": 0,
     "socket-timeout-": "Used for socket.settimeout, in seconds",
     "spec": "mixed-sanity",
