@@ -14,7 +14,7 @@ import (
 
 type WorkLoadCfg struct {
 	cfg      map[string]interface{} // Key-value map (see workload.json).
-	cfg_tree []interface{} // Decision tree (see workload-tree.json).
+	cfg_tree []interface{}          // Decision tree (see workload-tree.json).
 }
 
 func WorkLoadRun(sourceSpec string, params Params, target Target,
@@ -36,7 +36,7 @@ func WorkLoadCfgRead(cfg_path string) WorkLoadCfg {
 		log.Fatalf("error: missing decision 'tree' attribute from: %v", cfg_path)
 	}
 	return WorkLoadCfg{
-		cfg: cfg,
+		cfg:      cfg,
 		cfg_tree: ReadJSONFile(cfg["tree"].(string)).([]interface{}),
 	}
 }
@@ -56,16 +56,23 @@ func WorkLoadCfgLog(cfg WorkLoadCfg) {
 	}
 }
 
+func WorkLoadCfgGetInt(cfg WorkLoadCfg, key string, defaultVal int) int {
+	if cfg.cfg[key] != nil {
+		return int(cfg.cfg[key].(float64))
+	}
+	return defaultVal
+}
+
 func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Target,
 	statsChan chan Stats) {
 	bucket := "default"
-	report_every := 1000
-	ops_per_round := 100
+	report := WorkLoadCfgGetInt(cfg, "report", 40000)
+	ops_per_round := WorkLoadCfgGetInt(cfg, "batch", 100)
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0
 	reqs_gen := make(chan []Request)
 	res_map := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
-	res := make(chan *gomemcached.MCResponse)
+	res := make(chan *gomemcached.MCResponse, ops_per_round)
 
 	go func() {
 		reqs := make([]Request, ops_per_round)
@@ -84,7 +91,7 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 				}
 				opaque++
 			}
-			reqs_gen <-reqs
+			reqs_gen <- reqs
 		}
 	}()
 
@@ -113,7 +120,7 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 
 		tot_workload_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
 		tot_workload_ops += ops_per_round
-		if tot_workload_ops%report_every == 0 {
+		if tot_workload_ops%report == 0 {
 			statsChan <- Stats{
 				Keys: []string{
 					"tot_workload_ops",
@@ -142,4 +149,3 @@ func ReadJSONFile(path string) interface{} {
 	}
 	return data
 }
-
