@@ -1,9 +1,9 @@
 package grouter
-
 import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -135,10 +135,13 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 	bucket string, batch int, reqs_gen chan []Request,
 	res chan *gomemcached.MCResponse) {
+	cur := make(map[string] uint64)
 	opaque := uint32(0)
 	for {
 		reqs := make([]Request, batch)
 		for i := 0; i < batch; i++ {
+			cmd := WorkLoadNextCmd(cfg, clientNum, cfg.cmd_tree, 0, cur)
+			log.Printf("%v", cmd)
 			reqs[i] = Request{
 				Bucket: bucket,
 				Req: &gomemcached.MCRequest{
@@ -153,6 +156,91 @@ func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 		}
 		reqs_gen <- reqs
 	}
+}
+
+var WorkLoadCmds = make(map[string] func(cfg WorkLoadCfg, clientNum uint32,
+	cmd_tree []interface{}, pos int,
+	cur map[string] uint64) (int, string))
+
+func init() {
+	WorkLoadCmds["choose"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		name_true := cmd_tree[pos + 1].(string)
+		name_false := cmd_tree[pos + 2].(string)
+		block_true := cmd_tree[pos + 3].([]interface{})
+		block_false := cmd_tree[pos + 4].([]interface{})
+		cur_true := cur["tot-" + name_true]
+		cur_false := cur["tot-" + name_false]
+		cur_total := cur_true + cur_false
+		ratio_true := cfg.cfg["ratio-" + name_true].(float64)
+		if float64(cur_true) / float64(cur_total) < ratio_true {
+			cur["tot-" + name_true] += uint64(1)
+			return 5, WorkLoadNextCmd(cfg, clientNum, block_true, 0, cur)
+		}
+		cur["tot-" + name_false] += uint64(1)
+		return 5, WorkLoadNextCmd(cfg, clientNum, block_false, 0, cur)
+	}
+	WorkLoadCmds["new"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		cur["key"] = 2
+		return 1, "new"
+	}
+	WorkLoadCmds["hot"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		cur["key"] = 1
+		return 1, "hot"
+	}
+	WorkLoadCmds["cold"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		cur["key"] = 0
+		return 1, "cold"
+	}
+	WorkLoadCmds["miss"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		cur["key"] = math.MaxUint64
+		return 1, "miss"
+	}
+	WorkLoadCmds["create"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		return 1, "create " + strconv.FormatUint(cur["key"], 10)
+	}
+	WorkLoadCmds["delete"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		return 1, "delete " + strconv.FormatUint(cur["key"], 10)
+	}
+	WorkLoadCmds["set"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		return 1, "set " + strconv.FormatUint(cur["key"], 10)
+	}
+	WorkLoadCmds["get"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string] uint64) (int, string) {
+		return 1, "get " + strconv.FormatUint(cur["key"], 10)
+	}
+}
+
+func WorkLoadNextCmd(cfg WorkLoadCfg, clientNum uint32, cmd_tree []interface{},
+	pos int, cur map[string] uint64) string {
+	rv := ""
+	for pos < len(cmd_tree) {
+		cmd := cmd_tree[pos].(string)
+		cmd_func := WorkLoadCmds[cmd]
+		if cmd_func == nil {
+			log.Fatalf("error: unknown workload cmd: %v", cmd)
+		}
+		func_inc, func_rv := cmd_func(cfg, clientNum, cmd_tree, pos, cur)
+		pos += func_inc
+		rv = func_rv
+	}
+	return rv
 }
 
 // Helper function to read a JSON formatted data file.
