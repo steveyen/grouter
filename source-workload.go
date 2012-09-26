@@ -66,6 +66,13 @@ func WorkLoadCfgLog(cfg WorkLoadCfg) {
 }
 
 // Returns an int from a workload cfg by key.
+func WorkLoadCfgGetInt64(cfg WorkLoadCfg, key string, defaultVal int64) int64 {
+	if cfg.cfg[key] != nil {
+		return int64(cfg.cfg[key].(float64))
+	}
+	return defaultVal
+}
+
 func WorkLoadCfgGetInt(cfg WorkLoadCfg, key string, defaultVal int) int {
 	if cfg.cfg[key] != nil {
 		return int(cfg.cfg[key].(float64))
@@ -187,6 +194,11 @@ var WorkLoadCmds = make(map[string]func(cfg WorkLoadCfg, clientNum uint32,
 	cmd_tree []interface{}, pos int,
 	cur map[string]uint64, out []gomemcached.MCRequest) int)
 
+const (
+	DEFAULT_MAX_ITEM = int64(10000)
+	DEFAULT_MAX_CREATE = int64(10000)
+)
+
 func init() {
 	WorkLoadCmds["choose"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
@@ -212,7 +224,14 @@ func init() {
 	WorkLoadCmds["new"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
-		cur["key"] = 2
+		cur["key"] = cur["tot-item"]
+		if cur["tot-item"] < uint64(WorkLoadCfgGetInt64(cfg,
+			"max-item", DEFAULT_MAX_ITEM)) {
+			if cur["tot-create"] < uint64(WorkLoadCfgGetInt64(cfg,
+				"max-create", DEFAULT_MAX_CREATE)) {
+				cur["tot-item"] += 1
+			}
+		}
 		return 1
 	}
 	// Picks a hot key.
@@ -253,7 +272,7 @@ func init() {
 				Extras: extras,
 				Body:   []byte(key_str),
 			}
-			cur["out"] = cur["out"] + 1
+			cur["out"] += 1
 		}
 		return 1
 	}
@@ -267,7 +286,7 @@ func init() {
 				Opcode: gomemcached.GET,
 				Key:    []byte(key_str),
 			}
-			cur["out"] = cur["out"] + 1
+			cur["out"] += 1
 		}
 		return 1
 	}
@@ -281,7 +300,7 @@ func init() {
 				Opcode: gomemcached.DELETE,
 				Key:    []byte(key_str),
 			}
-			cur["out"] = cur["out"] + 1
+			cur["out"] += 1
 		}
 		return 1
 	}
