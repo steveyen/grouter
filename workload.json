@@ -33,6 +33,8 @@
     "backoff-factor-": "Exponential backoff factor on ETMPFAIL errors",
     "batch": 1000,
     "batch-": "Batch/pipeline up this # of commands per connection",
+    "cmd-tree": "workload-cmd-tree.json",
+    "cmd-tree-": "Command decision tree to follow when generating requests",
     "exit-after-creates": 0,
     "exit-after-creates-": "Exit after max-creates is reached",
     "expiration": 0,
@@ -71,8 +73,6 @@
     "threads-": "Number of client worker threads to use",
     "time": 0,
     "time-": "Stop after this many seconds if > 0",
-    "tree": "workload-tree.json",
-    "tree-": "Decision tree to follow when generating ops",
     "vbuckets": 0,
     "vbuckets-": "When >0, vbucket hash in memcached-binary protocol"
 }

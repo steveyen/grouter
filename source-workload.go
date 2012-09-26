@@ -13,9 +13,11 @@ import (
 )
 
 type WorkLoadCfg struct {
-	cfg      map[string]interface{} // Key-value map (see workload.json).
-	ops_tree []interface{}          // Ops generation decision tree
-									// (see workload-tree.json).
+	// Key-value map (see workload.json).
+	cfg map[string]interface{}
+
+	// Command generation decision tree (see workload-tree.json).
+	cmd_tree []interface{}
 }
 
 // The source entry function for synthetic workload generation.
@@ -32,16 +34,16 @@ func WorkLoadRun(sourceSpec string, params Params, target Target,
 	WorkLoad(cfg, uint32(0), sourceSpec, target, statsChan)
 }
 
-// Reads a workload cfg (JSON) from a file and the associated workload
+// Reads a workload cfg (JSON) from a file and the associated command
 // generation decision tree.
 func WorkLoadCfgRead(cfg_path string) WorkLoadCfg {
 	cfg := ReadJSONFile(cfg_path).(map[string]interface{})
-	if cfg["tree"] == nil {
-		log.Fatalf("error: missing decision 'tree' attribute from: %v", cfg_path)
+	if cfg["cmd-tree"] == nil {
+		log.Fatalf("error: missing decision 'cmd-tree' attribute from: %v", cfg_path)
 	}
 	return WorkLoadCfg{
 		cfg:      cfg,
-		ops_tree: ReadJSONFile(cfg["tree"].(string)).([]interface{}),
+		cmd_tree: ReadJSONFile(cfg["cmd-tree"].(string)).([]interface{}),
 	}
 }
 
