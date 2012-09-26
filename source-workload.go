@@ -22,6 +22,12 @@ type WorkLoadCfg struct {
 	cmd_tree []interface{}
 }
 
+const (
+	DEFAULT_MAX_ITEM   = int64(10000)
+	DEFAULT_MAX_CREATE = int64(10000)
+	DEFAULT_RATIO_HOT  = float64(1.0)
+)
+
 // The source entry function for synthetic workload generation.
 func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
@@ -66,6 +72,13 @@ func WorkLoadCfgLog(cfg WorkLoadCfg) {
 }
 
 // Returns an int from a workload cfg by key.
+func WorkLoadCfgGetFloat64(cfg WorkLoadCfg, key string, defaultVal float64) float64 {
+	if cfg.cfg[key] != nil {
+		return cfg.cfg[key].(float64)
+	}
+	return defaultVal
+}
+
 func WorkLoadCfgGetInt64(cfg WorkLoadCfg, key string, defaultVal int64) int64 {
 	if cfg.cfg[key] != nil {
 		return int64(cfg.cfg[key].(float64))
@@ -154,6 +167,7 @@ func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 		}
 		reqs := make([]Request, len(out))
 		for i, mc_req := range out {
+			log.Printf("%v", mc_req)
 			reqs[i] = Request{
 				Bucket: bucket,
 				Req: &gomemcached.MCRequest{
@@ -194,11 +208,6 @@ var WorkLoadCmds = make(map[string]func(cfg WorkLoadCfg, clientNum uint32,
 	cmd_tree []interface{}, pos int,
 	cur map[string]uint64, out []gomemcached.MCRequest) int)
 
-const (
-	DEFAULT_MAX_ITEM = int64(10000)
-	DEFAULT_MAX_CREATE = int64(10000)
-)
-
 func init() {
 	WorkLoadCmds["choose"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
@@ -238,14 +247,28 @@ func init() {
 	WorkLoadCmds["hot"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
-		cur["key"] = 1
+		ratio_hot := WorkLoadCfgGetFloat64(cfg, "ratio-hot", DEFAULT_RATIO_HOT)
+		items := uint64(float64(cur["tot-item"]) * ratio_hot)
+		if items <= 0 {
+			cur["key"] = cur["tot-item"] - 1
+		} else {
+			base := cur["tot-item"] - items
+			cur["key"] = base + (cur["tot-ops"] % items)
+		}
 		return 1
 	}
 	// Picks a cold key.
 	WorkLoadCmds["cold"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
-		cur["key"] = 0
+		ratio_hot := WorkLoadCfgGetFloat64(cfg, "ratio-hot", DEFAULT_RATIO_HOT)
+		items := uint64(float64(cur["tot-item"]) * (1.0 - ratio_hot))
+		if items <= 0 {
+			cur["key"] = uint64(0)
+		} else {
+			base := uint64(0)
+			cur["key"] = base + (cur["tot-ops"] % items)
+		}
 		return 1
 	}
 	// Picks a key that's not supposed to be in the db, so a miss.
@@ -272,6 +295,8 @@ func init() {
 				Extras: extras,
 				Body:   []byte(key_str),
 			}
+			cur["tot-ops-set"] += 1
+			cur["tot-ops"] += 1
 			cur["out"] += 1
 		}
 		return 1
@@ -286,11 +311,13 @@ func init() {
 				Opcode: gomemcached.GET,
 				Key:    []byte(key_str),
 			}
+			cur["tot-ops-get"] += 1
+			cur["tot-ops"] += 1
 			cur["out"] += 1
 		}
 		return 1
 	}
-	// Uses the current key for a QUERY.
+	// Uses the current key for a DELETE.
 	WorkLoadCmds["delete"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
@@ -300,6 +327,8 @@ func init() {
 				Opcode: gomemcached.DELETE,
 				Key:    []byte(key_str),
 			}
+			cur["tot-ops-delete"] += 1
+			cur["tot-ops"] += 1
 			cur["out"] += 1
 		}
 		return 1
