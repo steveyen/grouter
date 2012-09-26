@@ -167,7 +167,6 @@ func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 		}
 		reqs := make([]Request, len(out))
 		for i, mc_req := range out {
-			log.Printf("%v", mc_req)
 			reqs[i] = Request{
 				Bucket: bucket,
 				Req: &gomemcached.MCRequest{
