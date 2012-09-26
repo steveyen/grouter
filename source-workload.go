@@ -63,33 +63,41 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 	ops_per_round := 100
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0
-	res := make(chan *gomemcached.MCResponse)
+	reqs_gen := make(chan []Request)
 	res_map := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
-	opaque := uint32(0)
-	for {
+	res := make(chan *gomemcached.MCResponse)
+
+	go func() {
 		reqs := make([]Request, ops_per_round)
-		opaque_start := opaque
-		for i := 0; i < ops_per_round; i++ {
-			reqs[i] = Request{
-				Bucket: bucket,
-				Req: &gomemcached.MCRequest{
-					Opcode: gomemcached.GET,
-					Opaque: opaque,
-					Key:    []byte(strconv.FormatInt(int64(i), 10)),
-				},
-				Res:       res,
-				ClientNum: clientNum,
+		opaque := uint32(0)
+		for {
+			for i := 0; i < ops_per_round; i++ {
+				reqs[i] = Request{
+					Bucket: bucket,
+					Req: &gomemcached.MCRequest{
+						Opcode: gomemcached.GET,
+						Opaque: opaque,
+						Key:    []byte(strconv.FormatInt(int64(i), 10)),
+					},
+					Res:       res,
+					ClientNum: clientNum,
+				}
+				opaque++
 			}
-			opaque++
+			reqs_gen <-reqs
 		}
+	}()
+
+	for {
+		reqs := <-reqs_gen
 		reqs_start := time.Now()
 		targetChan := target.PickChannel(clientNum, bucket)
 		targetChan <- reqs
-		for i := 0; i < ops_per_round; i++ {
+		for _, req := range reqs {
 			// The responses might be out of order, where we use the
 			// opaque field to sequence the responses.  We have a
 			// res_map to stash early responses until needed.
-			res_opaque := opaque_start + uint32(i)
+			res_opaque := req.Req.Opaque
 			if res_map[res_opaque] != nil {
 				delete(res_map, res_opaque)
 			} else {
