@@ -209,6 +209,8 @@ var WorkLoadCmds = make(map[string]func(cfg WorkLoadCfg, clientNum uint32,
 	cur map[string]uint64, out []gomemcached.MCRequest) int)
 
 func init() {
+	// Evaluates ratios and recursively chooses either the left or
+	// right block of commands.
 	WorkLoadCmds["choose"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
