@@ -31,7 +31,7 @@
 
     "backoff-factor": 2.0,
     "backoff-factor-": "Exponential backoff factor on ETMPFAIL errors",
-    "batch": 100,
+    "batch": 1000,
     "batch-": "Batch/pipeline up this # of commands per connection",
     "exit-after-creates": 0,
     "exit-after-creates-": "Exit after max-creates is reached",
