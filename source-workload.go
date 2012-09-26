@@ -67,18 +67,18 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 	statsChan chan Stats) {
 	bucket := "default"
 	report := 100
-	ops_per_round := WorkLoadCfgGetInt(cfg, "batch", 100)
+	batch := WorkLoadCfgGetInt(cfg, "batch", 100)
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0
 	reqs_gen := make(chan []Request)
 	res_map := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
-	res := make(chan *gomemcached.MCResponse, ops_per_round)
+	res := make(chan *gomemcached.MCResponse, batch)
 
 	go func() {
 		opaque := uint32(0)
 		for {
-			reqs := make([]Request, ops_per_round)
-			for i := 0; i < ops_per_round; i++ {
+			reqs := make([]Request, batch)
+			for i := 0; i < batch; i++ {
 				reqs[i] = Request{
 					Bucket: bucket,
 					Req: &gomemcached.MCRequest{
@@ -119,7 +119,7 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 		reqs_end := time.Now()
 
 		tot_workload_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
-		tot_workload_ops += ops_per_round
+		tot_workload_ops += batch
 		if tot_workload_ops%report == 0 {
 			statsChan <- Stats{
 				Keys: []string{
