@@ -12,33 +12,38 @@ import (
 	"github.com/dustin/gomemcached"
 )
 
-func WorkLoadRun(sourceSpec string, params Params, target Target,
-	statsChan chan Stats) {
-	cfg_path := "./workload.json"
-	log.Printf("  cfg_path: %v", cfg_path)
-	cfg, cfg_tree := WorkLoadCfg(cfg_path)
-
-	WorkLoadCfgLog(cfg)
-	log.Printf("%v", cfg_tree)
-
-	for i := 1; i < params.TargetConcurrency; i++ {
-		go WorkLoad(uint32(i), sourceSpec, target, statsChan)
-	}
-	WorkLoad(uint32(0), sourceSpec, target, statsChan)
+type WorkLoadCfg struct {
+	cfg      map[string]interface{} // Key-value map (see workload.json).
+	cfg_tree []interface{} // Decision tree (see workload-tree.json).
 }
 
-func WorkLoadCfg(cfg_path string) (map[string]interface{}, []interface{}) {
+func WorkLoadRun(sourceSpec string, params Params, target Target,
+	statsChan chan Stats) {
+	cfg_path := "./workload.json" // TODO: Get cfg_path from params.
+	log.Printf("  cfg_path: %v", cfg_path)
+	cfg := WorkLoadCfgRead(cfg_path)
+	WorkLoadCfgLog(cfg)
+
+	for i := 1; i < params.TargetConcurrency; i++ {
+		go WorkLoad(cfg, uint32(i), sourceSpec, target, statsChan)
+	}
+	WorkLoad(cfg, uint32(0), sourceSpec, target, statsChan)
+}
+
+func WorkLoadCfgRead(cfg_path string) WorkLoadCfg {
 	cfg := ReadJSONFile(cfg_path).(map[string]interface{})
 	if cfg["tree"] == nil {
 		log.Fatalf("error: missing decision 'tree' attribute from: %v", cfg_path)
 	}
-	cfg_tree := ReadJSONFile(cfg["tree"].(string)).([]interface{})
-	return cfg, cfg_tree
+	return WorkLoadCfg{
+		cfg: cfg,
+		cfg_tree: ReadJSONFile(cfg["tree"].(string)).([]interface{}),
+	}
 }
 
-func WorkLoadCfgLog(m map[string]interface{}) {
-	keys := make([]string, 0, len(m))
-	for key := range m {
+func WorkLoadCfgLog(cfg WorkLoadCfg) {
+	keys := make([]string, 0, len(cfg.cfg))
+	for key := range cfg.cfg {
 		if !strings.HasSuffix(key, "-") {
 			keys = append(keys, key)
 		}
@@ -46,12 +51,12 @@ func WorkLoadCfgLog(m map[string]interface{}) {
 	sort.Strings(keys)
 	for _, key := range keys {
 		if !strings.HasSuffix(key, "-") {
-			log.Printf("    %v: %v - %v", key, m[key], m[key+"-"])
+			log.Printf("    %v: %v - %v", key, cfg.cfg[key], cfg.cfg[key+"-"])
 		}
 	}
 }
 
-func WorkLoad(clientNum uint32, sourceSpec string, target Target,
+func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Target,
 	statsChan chan Stats) {
 	bucket := "default"
 	report_every := 1000
