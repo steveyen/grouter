@@ -1,5 +1,7 @@
 package grouter
+
 import (
+	"encoding/binary"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -76,7 +78,7 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 	statsChan chan Stats) {
 	report := 100
 	bucket := "default"
-	batch := WorkLoadCfgGetInt(cfg, "batch", 100)
+	batch := WorkLoadCfgGetInt(cfg, "batch", 1000)
 
 	tot_workload_ops_nsecs := int64(0) // In nanoseconds.
 	tot_workload_ops := 0
@@ -135,19 +137,24 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 	bucket string, batch int, reqs_gen chan []Request,
 	res chan *gomemcached.MCResponse) {
-	cur := make(map[string] uint64)
+	cur := make(map[string]uint64)
+	out := make([]gomemcached.MCRequest, batch)
 	opaque := uint32(0)
 	for {
-		reqs := make([]Request, batch)
-		for i := 0; i < batch; i++ {
-			cmd := WorkLoadNextCmd(cfg, clientNum, cfg.cmd_tree, 0, cur)
-			log.Printf("%v", cmd)
+		cur["out"] = 0
+		for cur["out"] < uint64(len(out)) {
+			WorkLoadNextCmd(cfg, clientNum, cfg.cmd_tree, 0, cur, out)
+		}
+		reqs := make([]Request, len(out))
+		for i, mc_req := range out {
 			reqs[i] = Request{
 				Bucket: bucket,
 				Req: &gomemcached.MCRequest{
-					Opcode: gomemcached.GET,
+					Opcode: mc_req.Opcode,
 					Opaque: opaque,
-					Key:    []byte(strconv.FormatInt(int64(i), 10)),
+					Key:    mc_req.Key,
+					Extras: mc_req.Extras,
+					Body:   mc_req.Body,
 				},
 				Res:       res,
 				ClientNum: clientNum,
@@ -158,89 +165,126 @@ func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 	}
 }
 
-var WorkLoadCmds = make(map[string] func(cfg WorkLoadCfg, clientNum uint32,
-	cmd_tree []interface{}, pos int,
-	cur map[string] uint64) (int, string))
-
-func init() {
-	WorkLoadCmds["choose"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		name_true := cmd_tree[pos + 1].(string)
-		name_false := cmd_tree[pos + 2].(string)
-		block_true := cmd_tree[pos + 3].([]interface{})
-		block_false := cmd_tree[pos + 4].([]interface{})
-		cur_true := cur["tot-" + name_true]
-		cur_false := cur["tot-" + name_false]
-		cur_total := cur_true + cur_false
-		ratio_true := cfg.cfg["ratio-" + name_true].(float64)
-		if float64(cur_true) / float64(cur_total) < ratio_true {
-			cur["tot-" + name_true] += uint64(1)
-			return 5, WorkLoadNextCmd(cfg, clientNum, block_true, 0, cur)
-		}
-		cur["tot-" + name_false] += uint64(1)
-		return 5, WorkLoadNextCmd(cfg, clientNum, block_false, 0, cur)
-	}
-	WorkLoadCmds["new"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		cur["key"] = 2
-		return 1, "new"
-	}
-	WorkLoadCmds["hot"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		cur["key"] = 1
-		return 1, "hot"
-	}
-	WorkLoadCmds["cold"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		cur["key"] = 0
-		return 1, "cold"
-	}
-	WorkLoadCmds["miss"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		cur["key"] = math.MaxUint64
-		return 1, "miss"
-	}
-	WorkLoadCmds["create"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		return 1, "create " + strconv.FormatUint(cur["key"], 10)
-	}
-	WorkLoadCmds["delete"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		return 1, "delete " + strconv.FormatUint(cur["key"], 10)
-	}
-	WorkLoadCmds["set"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		return 1, "set " + strconv.FormatUint(cur["key"], 10)
-	}
-	WorkLoadCmds["get"] = func(cfg WorkLoadCfg, clientNum uint32,
-		cmd_tree []interface{}, pos int,
-		cur map[string] uint64) (int, string) {
-		return 1, "get " + strconv.FormatUint(cur["key"], 10)
-	}
-}
-
+// Runs the command decision tree once.  A single run might generate
+// more than one request in the out array, depending on the user's
+// decision tree, so we take care to stay under the out array size.
 func WorkLoadNextCmd(cfg WorkLoadCfg, clientNum uint32, cmd_tree []interface{},
-	pos int, cur map[string] uint64) string {
+	pos int, cur map[string]uint64, out []gomemcached.MCRequest) string {
 	rv := ""
-	for pos < len(cmd_tree) {
+	for pos < len(cmd_tree) && cur["out"] < uint64(len(out)) {
 		cmd := cmd_tree[pos].(string)
 		cmd_func := WorkLoadCmds[cmd]
 		if cmd_func == nil {
 			log.Fatalf("error: unknown workload cmd: %v", cmd)
 		}
-		func_inc, func_rv := cmd_func(cfg, clientNum, cmd_tree, pos, cur)
-		pos += func_inc
-		rv = func_rv
+		pos += cmd_func(cfg, clientNum, cmd_tree, pos, cur, out)
 	}
 	return rv
+}
+
+// Table of commands that a command decision tree can use.
+var WorkLoadCmds = make(map[string]func(cfg WorkLoadCfg, clientNum uint32,
+	cmd_tree []interface{}, pos int,
+	cur map[string]uint64, out []gomemcached.MCRequest) int)
+
+func init() {
+	WorkLoadCmds["choose"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string]uint64, out []gomemcached.MCRequest) int {
+		name_true := cmd_tree[pos+1].(string)
+		name_false := cmd_tree[pos+2].(string)
+		block_true := cmd_tree[pos+3].([]interface{})
+		block_false := cmd_tree[pos+4].([]interface{})
+		cur_true := cur["tot-"+name_true]
+		cur_false := cur["tot-"+name_false]
+		cur_total := cur_true + cur_false
+		ratio_true := cfg.cfg["ratio-"+name_true].(float64)
+		if float64(cur_true)/float64(cur_total) < ratio_true {
+			cur["tot-"+name_true] += uint64(1)
+			WorkLoadNextCmd(cfg, clientNum, block_true, 0, cur, out)
+			return 5
+		}
+		cur["tot-"+name_false] += uint64(1)
+		WorkLoadNextCmd(cfg, clientNum, block_false, 0, cur, out)
+		return 5
+	}
+	// Picks a new key.
+	WorkLoadCmds["new"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string]uint64, out []gomemcached.MCRequest) int {
+		cur["key"] = 2
+		return 1
+	}
+	// Picks a hot key.
+	WorkLoadCmds["hot"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string]uint64, out []gomemcached.MCRequest) int {
+		cur["key"] = 1
+		return 1
+	}
+	// Picks a cold key.
+	WorkLoadCmds["cold"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string]uint64, out []gomemcached.MCRequest) int {
+		cur["key"] = 0
+		return 1
+	}
+	// Picks a key that's not supposed to be in the db, so a miss.
+	WorkLoadCmds["miss"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string]uint64, out []gomemcached.MCRequest) int {
+		cur["key"] = math.MaxUint64
+		return 1
+	}
+	// Uses the current key for a SET.
+	WorkLoadCmds["set"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string]uint64, out []gomemcached.MCRequest) int {
+		if cur["out"] < uint64(len(out)) {
+			key_str := strconv.FormatUint(cur["key"], 10)
+			flg := 0
+			exp := 0
+			extras := make([]byte, 8)
+			binary.BigEndian.PutUint32(extras, uint32(flg))
+			binary.BigEndian.PutUint32(extras[4:], uint32(exp))
+			out[cur["out"]] = gomemcached.MCRequest{
+				Opcode: gomemcached.SET,
+				Key:    []byte(key_str),
+				Extras: extras,
+				Body:   []byte(key_str),
+			}
+			cur["out"] = cur["out"] + 1
+		}
+		return 1
+	}
+	// Uses the current key for a GET.
+	WorkLoadCmds["get"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string]uint64, out []gomemcached.MCRequest) int {
+		if cur["out"] < uint64(len(out)) {
+			key_str := strconv.FormatUint(cur["key"], 10)
+			out[cur["out"]] = gomemcached.MCRequest{
+				Opcode: gomemcached.GET,
+				Key:    []byte(key_str),
+			}
+			cur["out"] = cur["out"] + 1
+		}
+		return 1
+	}
+	// Uses the current key for a QUERY.
+	WorkLoadCmds["delete"] = func(cfg WorkLoadCfg, clientNum uint32,
+		cmd_tree []interface{}, pos int,
+		cur map[string]uint64, out []gomemcached.MCRequest) int {
+		if cur["out"] < uint64(len(out)) {
+			key_str := strconv.FormatUint(cur["key"], 10)
+			out[cur["out"]] = gomemcached.MCRequest{
+				Opcode: gomemcached.DELETE,
+				Key:    []byte(key_str),
+			}
+			cur["out"] = cur["out"] + 1
+		}
+		return 1
+	}
 }
 
 // Helper function to read a JSON formatted data file.

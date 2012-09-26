@@ -1,6 +1,6 @@
 [ "choose", "mutation", "read",
   [ "choose", "create", "update",
-    [ "new", "create" ],
+    [ "new", "set" ],
     [ "choose", "delete", "set",
       [ "choose", "hot-delete", "cold-delete",
         [ "hot", "delete" ],
