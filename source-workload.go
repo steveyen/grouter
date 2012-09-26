@@ -75,9 +75,9 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 	res := make(chan *gomemcached.MCResponse, ops_per_round)
 
 	go func() {
-		reqs := make([]Request, ops_per_round)
 		opaque := uint32(0)
 		for {
+			reqs := make([]Request, ops_per_round)
 			for i := 0; i < ops_per_round; i++ {
 				reqs[i] = Request{
 					Bucket: bucket,
