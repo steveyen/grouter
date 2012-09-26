@@ -78,8 +78,7 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 
 	go WorkLoadBatchRun(cfg, clientNum, sourceSpec, bucket, batch, reqs_gen, res)
 
-	for {
-		reqs := <-reqs_gen
+	for reqs := range reqs_gen {
 		reqs_start := time.Now()
 		targetChan := target.PickChannel(clientNum, bucket)
 		targetChan <- reqs
