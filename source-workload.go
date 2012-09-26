@@ -84,7 +84,7 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 	tot_workload_ops := 0
 
 	res := make(chan *gomemcached.MCResponse, batch)
-	res_map := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
+	res_prev := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
 	reqs_gen := make(chan []Request)
 
 	// A separate goroutine generates the next batch concurrently
@@ -98,19 +98,19 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 		for _, req := range reqs {
 			// The responses might be out of order, where we use the
 			// opaque field to sequence the responses.  We have a
-			// res_map to stash early responses until needed.
+			// res_prev to stash early responses until needed.
 			res_opaque := req.Req.Opaque
-			if res_map[res_opaque] != nil {
-				delete(res_map, res_opaque)
+			if res_prev[res_opaque] != nil {
+				delete(res_prev, res_opaque)
 			} else {
 				mc_res := <-res
 				if mc_res.Opaque != res_opaque {
-					// TODO: assert(res_map[res_opaque] == nil)
-					res_map[res_opaque] = mc_res
+					// TODO: assert(res_prev[res_opaque] == nil)
+					res_prev[res_opaque] = mc_res
 				}
 			}
 		}
-		// TODO: assert(len(res_map) == 0)
+		// TODO: assert(len(res_prev) == 0)
 		reqs_end := time.Now()
 
 		tot_workload_ops_nsecs += reqs_end.Sub(reqs_start).Nanoseconds()
@@ -191,21 +191,21 @@ func init() {
 	WorkLoadCmds["choose"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
-		name_true := cmd_tree[pos+1].(string)
-		name_false := cmd_tree[pos+2].(string)
-		block_true := cmd_tree[pos+3].([]interface{})
-		block_false := cmd_tree[pos+4].([]interface{})
-		cur_true := cur["tot-"+name_true]
-		cur_false := cur["tot-"+name_false]
-		cur_total := cur_true + cur_false
-		ratio_true := cfg.cfg["ratio-"+name_true].(float64)
-		if float64(cur_true)/float64(cur_total) < ratio_true {
-			cur["tot-"+name_true] += uint64(1)
-			WorkLoadNextCmd(cfg, clientNum, block_true, 0, cur, out)
+		name_left := cmd_tree[pos+1].(string)
+		name_right := cmd_tree[pos+2].(string)
+		block_left := cmd_tree[pos+3].([]interface{})
+		block_right := cmd_tree[pos+4].([]interface{})
+		cur_left := cur["tot-"+name_left]
+		cur_right := cur["tot-"+name_right]
+		cur_total := cur_left + cur_right
+		ratio_left := cfg.cfg["ratio-"+name_left].(float64)
+		if float64(cur_left)/float64(cur_total) < ratio_left {
+			cur["tot-"+name_left] += uint64(1)
+			WorkLoadNextCmd(cfg, clientNum, block_left, 0, cur, out)
 			return 5
 		}
-		cur["tot-"+name_false] += uint64(1)
-		WorkLoadNextCmd(cfg, clientNum, block_false, 0, cur, out)
+		cur["tot-"+name_right] += uint64(1)
+		WorkLoadNextCmd(cfg, clientNum, block_right, 0, cur, out)
 		return 5
 	}
 	// Picks a new key.
