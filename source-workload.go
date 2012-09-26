@@ -17,6 +17,7 @@ type WorkLoadCfg struct {
 	cfg_tree []interface{}          // Decision tree (see workload-tree.json).
 }
 
+// The source entry function for synthetic workload generation.
 func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
 	cfg_path := "./workload.json" // TODO: Get cfg_path from params.
@@ -30,6 +31,8 @@ func WorkLoadRun(sourceSpec string, params Params, target Target,
 	WorkLoad(cfg, uint32(0), sourceSpec, target, statsChan)
 }
 
+// Reads a workload cfg (JSON) from a file and the associated workload
+// generation decision tree.
 func WorkLoadCfgRead(cfg_path string) WorkLoadCfg {
 	cfg := ReadJSONFile(cfg_path).(map[string]interface{})
 	if cfg["tree"] == nil {
@@ -41,6 +44,7 @@ func WorkLoadCfgRead(cfg_path string) WorkLoadCfg {
 	}
 }
 
+// Logs a workload cfg for debugging/diagnosis.
 func WorkLoadCfgLog(cfg WorkLoadCfg) {
 	keys := make([]string, 0, len(cfg.cfg))
 	for key := range cfg.cfg {
@@ -56,6 +60,7 @@ func WorkLoadCfgLog(cfg WorkLoadCfg) {
 	}
 }
 
+// Returns an int from a workload cfg by key.
 func WorkLoadCfgGetInt(cfg WorkLoadCfg, key string, defaultVal int) int {
 	if cfg.cfg[key] != nil {
 		return int(cfg.cfg[key].(float64))
@@ -63,6 +68,7 @@ func WorkLoadCfgGetInt(cfg WorkLoadCfg, key string, defaultVal int) int {
 	return defaultVal
 }
 
+// Main function that sends workload requests and processes responses.
 func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Target,
 	statsChan chan Stats) {
 	report := 100
@@ -76,6 +82,8 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 	res_map := make(map[uint32]*gomemcached.MCResponse) // Key is opaque uint32.
 	reqs_gen := make(chan []Request)
 
+	// A separate goroutine generates the next batch concurrently
+	// while a current batch is in-flight.
 	go WorkLoadBatchRun(cfg, clientNum, sourceSpec, bucket, batch, reqs_gen, res)
 
 	for reqs := range reqs_gen {
@@ -119,6 +127,7 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 	}
 }
 
+// Helper function that generates workload requests onto a reqs_gen channel.
 func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 	bucket string, batch int, reqs_gen chan []Request, res chan *gomemcached.MCResponse) {
 	opaque := uint32(0)
@@ -141,6 +150,7 @@ func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 	}
 }
 
+// Helper function to read a JSON formatted data file.
 func ReadJSONFile(path string) interface{} {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
