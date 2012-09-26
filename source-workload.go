@@ -18,19 +18,7 @@ func WorkLoadRun(sourceSpec string, params Params, target Target,
 	log.Printf("  cfg_path: %v", cfg_path)
 	cfg, cfg_tree := WorkLoadCfg(cfg_path)
 
-	cfg_keys := make([]string, 0, len(cfg))
-	for k := range cfg {
-		if !strings.HasSuffix(k, "-") {
-			cfg_keys = append(cfg_keys, k)
-		}
-	}
-	sort.Strings(cfg_keys)
-	for _, k := range cfg_keys {
-		if !strings.HasSuffix(k, "-") {
-			log.Printf("    %v: %v - %v", k, cfg[k], cfg[k+"-"])
-		}
-	}
-
+	WorkLoadCfgLog(cfg)
 	log.Printf("%v", cfg_tree)
 
 	for i := 1; i < params.TargetConcurrency; i++ {
@@ -48,17 +36,19 @@ func WorkLoadCfg(cfg_path string) (map[string]interface{}, []interface{}) {
 	return cfg, cfg_tree
 }
 
-func ReadJSONFile(path string) interface{} {
-	bytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Fatalf("error: could not read: %v; err: %v", path, err)
+func WorkLoadCfgLog(m map[string]interface{}) {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		if !strings.HasSuffix(key, "-") {
+			keys = append(keys, key)
+		}
 	}
-	var data interface{}
-	err = json.Unmarshal(bytes, &data)
-	if err != nil {
-		log.Fatalf("error: could not parse json from: %v; err: %v", path, err)
+	sort.Strings(keys)
+	for _, key := range keys {
+		if !strings.HasSuffix(key, "-") {
+			log.Printf("    %v: %v - %v", key, m[key], m[key+"-"])
+		}
 	}
-	return data
 }
 
 func WorkLoad(clientNum uint32, sourceSpec string, target Target,
@@ -126,3 +116,17 @@ func WorkLoad(clientNum uint32, sourceSpec string, target Target,
 		}
 	}
 }
+
+func ReadJSONFile(path string) interface{} {
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatalf("error: could not read: %v; err: %v", path, err)
+	}
+	var data interface{}
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		log.Fatalf("error: could not parse json from: %v; err: %v", path, err)
+	}
+	return data
+}
+
