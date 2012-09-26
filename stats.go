@@ -2,6 +2,7 @@ package grouter
 
 import (
 	"log"
+	"sort"
 	"strings"
 	"time"
 )
@@ -30,6 +31,8 @@ func StartStatsReporter(chanSize int) chan Stats {
 				full := reportNum%10 == 0
 				if StatsReport(curr, prev, reportSecs, full) && full {
 					log.Printf("-------------")
+				} else {
+					log.Printf("----")
 				}
 				for k, v := range curr {
 					prev[k] = v
@@ -47,11 +50,21 @@ func StatsReport(curr map[string]int64, prev map[string]int64,
 	// Reports rates on paired stats that follow a naming convention
 	// like xxx and xxx_usecs.  For example, tot_ops and tot_ops_usecs.
 	emitted := false
-	for k, v := range curr {
+
+	i := 0
+	keys := make([]string, len(curr))
+	for key := range curr {
+		keys[i] = key
+		i++
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		v := curr[k]
 		if strings.HasSuffix(k, "_usecs") {
 			continue
 		}
-		if strings.HasPrefix(k, "tot_") {
+		if strings.HasPrefix(k, "tot_") || strings.HasPrefix(k, "tot-") {
 			v_diff := v - prev[k]
 			k_per_sec := float64(v_diff) / reportSecs.Seconds()
 			if k_per_sec > 0 {

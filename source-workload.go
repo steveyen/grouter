@@ -26,6 +26,7 @@ const (
 	DEFAULT_MAX_ITEM   = int64(10000)
 	DEFAULT_MAX_CREATE = int64(10000)
 	DEFAULT_RATIO_HOT  = float64(1.0)
+	LARGE_PRIME        = uint64(9576890767)
 )
 
 // The source entry function for synthetic workload generation.
@@ -109,7 +110,8 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 
 	// A separate goroutine generates the next batch concurrently
 	// while a current batch is in-flight.
-	go WorkLoadBatchRun(cfg, clientNum, sourceSpec, bucket, batch, reqs_gen, res)
+	go WorkLoadBatchRun(cfg, clientNum, sourceSpec, bucket, batch,
+		reqs_gen, res, statsChan)
 
 	for reqs := range reqs_gen {
 		reqs_start := time.Now()
@@ -156,7 +158,8 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 // reqs_gen channel.
 func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 	bucket string, batch int, reqs_gen chan []Request,
-	res chan *gomemcached.MCResponse) {
+	res chan *gomemcached.MCResponse, statsChan chan Stats) {
+	pre := make(map[string]uint64)
 	cur := make(map[string]uint64)
 	out := make([]gomemcached.MCRequest, batch)
 	opaque := uint32(0)
@@ -182,6 +185,24 @@ func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 			opaque++
 		}
 		reqs_gen <- reqs
+
+		if opaque % 100 == 0 {
+			keys := make([]string, len(cur))
+			vals := make([]int64, len(cur))
+			i := 0
+			for k, v := range cur {
+				keys[i] = k
+				vals[i] = int64(v - pre[k])
+				i++
+			}
+			statsChan <- Stats{
+				Keys: keys,
+				Vals: vals,
+			}
+			for k, v := range cur {
+				pre[k] = v
+			}
+		}
 	}
 }
 
