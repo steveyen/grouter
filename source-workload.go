@@ -35,9 +35,25 @@ const (
 // The source entry function for synthetic workload generation.
 func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
+	if strings.HasPrefix(sourceSpec, "workload:") {
+		sourceSpec = sourceSpec[len("workload:"):]
+	}
 	cfg_path := "./workload.json" // TODO: Get cfg_path from params.
-	log.Printf("  cfg_path: %v", cfg_path)
+	sourceSpecSplit := strings.Split(sourceSpec, ",")
+	for _, kv := range sourceSpecSplit {
+		kvArr := strings.Split(kv, "=")
+		if len(kvArr) > 1 && kvArr[0] == "cfg-path" {
+			cfg_path = kvArr[1]
+		}
+	}
+	log.Printf("  cfg-path: %v", cfg_path)
 	cfg := WorkLoadCfgRead(cfg_path)
+	for _, kv := range sourceSpecSplit {
+		kvArr := strings.Split(kv, "=")
+		if len(kvArr) > 1 {
+			cfg.cfg[kvArr[0]] = kvArr[1]
+		}
+	}
 	WorkLoadCfgLog(cfg)
 
 	for i := 1; i < params.TargetConcurrency; i++ {
