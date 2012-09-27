@@ -29,10 +29,12 @@ func StartStatsReporter(chanSize int) chan Stats {
 				}
 			case <-reportChan:
 				full := reportNum%10 == 0
-				if StatsReport(curr, prev, reportSecs, full) && full {
-					log.Printf("-------------")
-				} else {
-					log.Printf("----")
+				if StatsReport(curr, prev, reportSecs, full) {
+					if full {
+						log.Printf("-------------")
+					} else {
+						log.Printf("----")
+					}
 				}
 				for k, v := range curr {
 					prev[k] = v
