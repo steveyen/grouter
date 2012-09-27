@@ -165,7 +165,7 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 
 		if tot_batch%200 == 0 {
 			statsChan <- Stats{
-				Keys: []string{"tot_batch"},
+				Keys: []string{"tot-batch"},
 				Vals: []int64{tot_batch},
 			}
 			tot_batch = int64(0)

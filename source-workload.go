@@ -176,8 +176,8 @@ func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Targe
 		if tot_workload_ops%report == 0 {
 			statsChan <- Stats{
 				Keys: []string{
-					"tot_workload_ops",
-					"tot_workload_ops_usecs",
+					"tot-workload-ops",
+					"tot-workload-ops-usecs",
 				},
 				Vals: []int64{
 					int64(tot_workload_ops),

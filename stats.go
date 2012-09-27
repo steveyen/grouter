@@ -48,7 +48,7 @@ func StartStatsReporter(chanSize int) chan Stats {
 func StatsReport(curr map[string]int64, prev map[string]int64,
 	reportSecs time.Duration, full bool) bool {
 	// Reports rates on paired stats that follow a naming convention
-	// like xxx and xxx_usecs.  For example, tot_ops and tot_ops_usecs.
+	// like xxx and xxx_usecs.  For example, tot-ops and tot-ops-usecs.
 	emitted := false
 
 	i := 0
@@ -61,17 +61,17 @@ func StatsReport(curr map[string]int64, prev map[string]int64,
 
 	for _, k := range keys {
 		v := curr[k]
-		if strings.HasSuffix(k, "_usecs") {
+		if strings.HasSuffix(k, "-usecs") {
 			continue
 		}
-		if strings.HasPrefix(k, "tot_") || strings.HasPrefix(k, "tot-") {
+		if strings.HasPrefix(k, "tot-") {
 			v_diff := v - prev[k]
 			k_per_sec := float64(v_diff) / reportSecs.Seconds()
 			if k_per_sec > 0 {
 				if full {
 					log.Printf("%v: %v, per sec: %f", k, v, k_per_sec)
 				} else {
-					k_usecs := k + "_usecs"
+					k_usecs := k + "-usecs"
 					d_usecs := float64(curr[k_usecs] - prev[k_usecs])
 					if d_usecs > 0 {
 						log.Printf("%v per sec: %f, avg latency: %f",

@@ -61,8 +61,8 @@ func (self AsciiSource) Run(s io.ReadWriter, clientNum uint32, target Target,
 		if tot_source_ascii_ops%100 == 0 {
 			statsChan <- Stats{
 				Keys: []string{
-					"tot_source_ascii_ops",
-					"tot_source_ascii_ops_usecs",
+					"tot-source-ascii-ops",
+					"tot-source-ascii-ops-usecs",
 				},
 				Vals: []int64{
 					int64(tot_source_ascii_ops),
