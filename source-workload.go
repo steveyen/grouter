@@ -97,6 +97,13 @@ func WorkLoadCfgGetInt(cfg WorkLoadCfg, key string, defaultVal int) int {
 	return defaultVal
 }
 
+func WorkLoadCfgGetString(cfg WorkLoadCfg, key string, defaultVal string) string {
+	if cfg.cfg[key] != nil {
+		return cfg.cfg[key].(string)
+	}
+	return defaultVal
+}
+
 // Main function that sends workload requests and processes responses.
 func WorkLoad(cfg WorkLoadCfg, clientNum uint32, sourceSpec string, target Target,
 	statsChan chan Stats) {
@@ -189,7 +196,7 @@ func WorkLoadBatchRun(cfg WorkLoadCfg, clientNum uint32, sourceSpec string,
 		}
 		reqs_gen <- reqs
 
-		if opaque % 100 == 0 {
+		if opaque%100 == 0 {
 			keys := make([]string, len(cur))
 			vals := make([]int64, len(cur))
 			i := 0
@@ -308,8 +315,7 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := WorkLoadKeyString(cur["key"],
-				WorkLoadCfgGetInt(cfg, "hashed", 1) > 0)
+			key_str := WorkLoadKeyString(cfg, cur["key"])
 			flg := 0
 			exp := 0
 			extras := make([]byte, 8)
@@ -332,8 +338,7 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := WorkLoadKeyString(cur["key"],
-				WorkLoadCfgGetInt(cfg, "hashed", 1) > 0)
+			key_str := WorkLoadKeyString(cfg, cur["key"])
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.GET,
 				Key:    []byte(key_str),
@@ -349,8 +354,7 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := WorkLoadKeyString(cur["key"],
-				WorkLoadCfgGetInt(cfg, "hashed", 1) > 0)
+			key_str := WorkLoadKeyString(cfg, cur["key"])
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.DELETE,
 				Key:    []byte(key_str),
@@ -363,10 +367,15 @@ func init() {
 	}
 }
 
-func WorkLoadKeyString(key uint64, hashed bool) string {
+func WorkLoadKeyString(cfg WorkLoadCfg, key uint64) string {
 	s := strconv.FormatUint(key, 10)
+	hashed := WorkLoadCfgGetInt(cfg, "hashed", 1) > 0
 	if hashed {
-		return MD5(s)
+		s = MD5(s)[0:16]
+	}
+	prefix := WorkLoadCfgGetString(cfg, "prefix", "")
+	if len(prefix) > 0 {
+		s = prefix + "-" + s
 	}
 	return s
 }
@@ -374,7 +383,7 @@ func WorkLoadKeyString(key uint64, hashed bool) string {
 func MD5(s string) string {
 	h := md5.New()
 	io.WriteString(h, s)
-	return hex.EncodeToString(h.Sum(nil))[0:16]
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // Helper function to read a JSON formatted data file.

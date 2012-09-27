@@ -55,6 +55,8 @@
     "max-ops-per-sec-": "When >0, max ops/second target workload",
     "min-value-size": "10",
     "min-value-size-": "In bytes; comma-separated",
+    "prefix": "",
+    "prefix-": "prefix for generated keys; hyphen ('-') separator auto-added",
     "queries": "",
     "queries-": "Query templates; semicolon-separated",
     "deterministic": 1,
