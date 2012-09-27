@@ -1,8 +1,11 @@
 package grouter
 
 import (
+	"crypto/md5"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -305,7 +308,8 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := strconv.FormatUint(cur["key"], 10)
+			key_str := WorkLoadKeyString(cur["key"],
+				WorkLoadCfgGetInt(cfg, "hashed", 1) > 0)
 			flg := 0
 			exp := 0
 			extras := make([]byte, 8)
@@ -328,7 +332,8 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := strconv.FormatUint(cur["key"], 10)
+			key_str := WorkLoadKeyString(cur["key"],
+				WorkLoadCfgGetInt(cfg, "hashed", 1) > 0)
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.GET,
 				Key:    []byte(key_str),
@@ -344,7 +349,8 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := strconv.FormatUint(cur["key"], 10)
+			key_str := WorkLoadKeyString(cur["key"],
+				WorkLoadCfgGetInt(cfg, "hashed", 1) > 0)
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.DELETE,
 				Key:    []byte(key_str),
@@ -355,6 +361,20 @@ func init() {
 		}
 		return 1
 	}
+}
+
+func WorkLoadKeyString(key uint64, hashed bool) string {
+	s := strconv.FormatUint(key, 10)
+	if hashed {
+		return MD5(s)
+	}
+	return s
+}
+
+func MD5(s string) string {
+	h := md5.New()
+	io.WriteString(h, s)
+	return hex.EncodeToString(h.Sum(nil))[0:16]
 }
 
 // Helper function to read a JSON formatted data file.
