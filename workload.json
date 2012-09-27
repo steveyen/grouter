@@ -13,9 +13,9 @@
     "cur-query-": "Number of reads that were view/index queries",
 
     "choose-create": 0.1,
-    "choose-create-": "Fraction of mutations that should create new items",
+    "choose-create-": "Fraction of mutations that should create new items (instead of updates)",
     "choose-delete": 0.0,
-    "choose-delete-": "Fraction of updates that should be deletes",
+    "choose-delete-": "Fraction of updates that should be deletes (instead of sets)",
     "choose-delete-hot": 0.95,
     "choose-delete-hot-": "Fraction of deletes that hit the hot item subset",
     "choose-get-hot": 0.95,
@@ -25,9 +25,9 @@
     "choose-set-hot": 0.95,
     "choose-set-hot-": "Fraction of sets that hit the hot item subset",
     "choose-mutation": 0.1,
-    "choose-mutation-": "Fraction of ops that should be mutations",
+    "choose-mutation-": "Fraction of ops that should be mutations (instead of reads)",
     "choose-query": 0.0,
-    "choose-query-": "Fraction of reads that should be queries",
+    "choose-query-": "Fraction of reads that should be queries (instead of gets)",
 
     "backoff-factor": 2.0,
     "backoff-factor-": "Exponential backoff factor on ETMPFAIL errors",
