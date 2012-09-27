@@ -33,6 +33,8 @@
     "backoff-factor-": "Exponential backoff factor on ETMPFAIL errors",
     "batch": 1000,
     "batch-": "Batch/pipeline up this # of commands per connection",
+    "concurrency": 1,
+    "concurrency-": "Number of concurrent workload generators",
     "cmd-tree": "workload-cmd-tree.json",
     "cmd-tree-": "Command decision tree to follow when generating requests",
     "exit-after-create": 0,

@@ -36,8 +36,8 @@ const (
 func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
 	cfg := WorkLoadCfgLog(WorkLoadCfgRead(sourceSpec, "./workload.json"))
-
-	for i := 1; i < params.TargetConcurrency; i++ {
+	num := WorkLoadCfgGetFloat64(cfg, "concurrency", float64(params.TargetConcurrency))
+	for i := 1; i < int(num); i++ {
 		go WorkLoad(cfg, uint32(i), sourceSpec, target, statsChan)
 	}
 	WorkLoad(cfg, uint32(0), sourceSpec, target, statsChan)
@@ -66,7 +66,12 @@ func WorkLoadCfgRead(sourceSpec string, cfg_path string) WorkLoadCfg {
 	for _, kv := range sourceSpecSplit {
 		kvArr := strings.Split(kv, "=")
 		if len(kvArr) > 1 {
-			cfg[kvArr[0]] = kvArr[1]
+			v, err := strconv.ParseFloat(kvArr[1], 64)
+			if err == nil {
+				cfg[kvArr[0]] = v
+			} else {
+				cfg[kvArr[0]] = kvArr[1]
+			}
 		}
 	}
 
