@@ -35,26 +35,7 @@ const (
 // The source entry function for synthetic workload generation.
 func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
-	if strings.HasPrefix(sourceSpec, "workload:") {
-		sourceSpec = sourceSpec[len("workload:"):]
-	}
-	cfg_path := "./workload.json" // TODO: Get cfg_path from params.
-	sourceSpecSplit := strings.Split(sourceSpec, ",")
-	for _, kv := range sourceSpecSplit {
-		kvArr := strings.Split(kv, "=")
-		if len(kvArr) > 1 && kvArr[0] == "cfg-path" {
-			cfg_path = kvArr[1]
-		}
-	}
-	log.Printf("  cfg-path: %v", cfg_path)
-	cfg := WorkLoadCfgRead(cfg_path)
-	for _, kv := range sourceSpecSplit {
-		kvArr := strings.Split(kv, "=")
-		if len(kvArr) > 1 {
-			cfg.cfg[kvArr[0]] = kvArr[1]
-		}
-	}
-	WorkLoadCfgLog(cfg)
+	cfg := WorkLoadCfgLog(WorkLoadCfgRead(sourceSpec, "./workload.json"))
 
 	for i := 1; i < params.TargetConcurrency; i++ {
 		go WorkLoad(cfg, uint32(i), sourceSpec, target, statsChan)
@@ -64,10 +45,33 @@ func WorkLoadRun(sourceSpec string, params Params, target Target,
 
 // Reads a workload cfg (JSON) from a file and the associated command
 // generation decision tree.
-func WorkLoadCfgRead(cfg_path string) WorkLoadCfg {
+func WorkLoadCfgRead(sourceSpec string, cfg_path string) WorkLoadCfg {
+	if strings.HasPrefix(sourceSpec, "workload:") {
+		sourceSpec = sourceSpec[len("workload:"):]
+	}
+	sourceSpecSplit := strings.Split(sourceSpec, ",")
+
+	// The cfg-path value from the sourceSpec takes precedence.
+	for _, kv := range sourceSpecSplit {
+		kvArr := strings.Split(kv, "=")
+		if len(kvArr) > 1 && kvArr[0] == "cfg-path" {
+			cfg_path = kvArr[1]
+		}
+	}
+
+	log.Printf("  cfg-path: %v", cfg_path)
 	cfg := ReadJSONFile(cfg_path).(map[string]interface{})
+
+	// The values from the sourceSpec take precedence.
+	for _, kv := range sourceSpecSplit {
+		kvArr := strings.Split(kv, "=")
+		if len(kvArr) > 1 {
+			cfg[kvArr[0]] = kvArr[1]
+		}
+	}
+
 	if cfg["cmd-tree"] == nil {
-		log.Fatalf("error: missing decision 'cmd-tree' attribute from: %v", cfg_path)
+		log.Fatalf("error: missing decision 'cmd-tree' parameter")
 	}
 	return WorkLoadCfg{
 		cfg:      cfg,
@@ -76,7 +80,7 @@ func WorkLoadCfgRead(cfg_path string) WorkLoadCfg {
 }
 
 // Logs a workload cfg for debugging/diagnosis.
-func WorkLoadCfgLog(cfg WorkLoadCfg) {
+func WorkLoadCfgLog(cfg WorkLoadCfg) WorkLoadCfg {
 	keys := make([]string, 0, len(cfg.cfg))
 	for key := range cfg.cfg {
 		if !strings.HasSuffix(key, "-") {
@@ -89,6 +93,7 @@ func WorkLoadCfgLog(cfg WorkLoadCfg) {
 			log.Printf("    %v: %v - %v", key, cfg.cfg[key], cfg.cfg[key+"-"])
 		}
 	}
+	return cfg
 }
 
 // Returns an int from a workload cfg by key.
