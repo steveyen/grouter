@@ -244,20 +244,20 @@ func init() {
 	WorkLoadCmds["choose"] = func(cfg WorkLoadCfg, clientNum uint32,
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
-		name_left := cmd_tree[pos+1].(string)
-		name_right := cmd_tree[pos+2].(string)
+		var_left := cmd_tree[pos+1].(string)
+		var_right := cmd_tree[pos+2].(string)
 		block_left := cmd_tree[pos+3].([]interface{})
 		block_right := cmd_tree[pos+4].([]interface{})
-		cur_left := cur["tot-"+name_left]
-		cur_right := cur["tot-"+name_right]
+		cur_left := cur["tot-"+var_left]
+		cur_right := cur["tot-"+var_right]
 		cur_total := cur_left + cur_right
-		ratio_left := cfg.cfg["ratio-"+name_left].(float64)
+		ratio_left := cfg.cfg["ratio-"+var_left].(float64)
 		if float64(cur_left)/float64(cur_total) < ratio_left {
-			cur["tot-"+name_left] += uint64(1)
+			cur["tot-"+var_left] += uint64(1)
 			WorkLoadNextCmd(cfg, clientNum, block_left, 0, cur, out)
 			return 5
 		}
-		cur["tot-"+name_right] += uint64(1)
+		cur["tot-"+var_right] += uint64(1)
 		WorkLoadNextCmd(cfg, clientNum, block_right, 0, cur, out)
 		return 5
 	}
@@ -315,17 +315,14 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := WorkLoadKeyString(cfg, cur["key"])
-			flg := 0
-			exp := 0
 			extras := make([]byte, 8)
-			binary.BigEndian.PutUint32(extras, uint32(flg))
-			binary.BigEndian.PutUint32(extras[4:], uint32(exp))
+			binary.BigEndian.PutUint32(extras, uint32(0)) // flg.
+			binary.BigEndian.PutUint32(extras[4:], uint32(0)) // exp.
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.SET,
-				Key:    []byte(key_str),
+				Key:    []byte(WorkLoadKeyString(cfg, cur["key"])),
 				Extras: extras,
-				Body:   []byte(key_str),
+				Body:   []byte(WorkLoadKeyString(cfg, cur["key"])),
 			}
 			cur["tot-ops-set"] += 1
 			cur["tot-ops"] += 1
@@ -338,10 +335,9 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := WorkLoadKeyString(cfg, cur["key"])
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.GET,
-				Key:    []byte(key_str),
+				Key:    []byte(WorkLoadKeyString(cfg, cur["key"])),
 			}
 			cur["tot-ops-get"] += 1
 			cur["tot-ops"] += 1
@@ -354,10 +350,9 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
-			key_str := WorkLoadKeyString(cfg, cur["key"])
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.DELETE,
-				Key:    []byte(key_str),
+				Key:    []byte(WorkLoadKeyString(cfg, cur["key"])),
 			}
 			cur["tot-ops-delete"] += 1
 			cur["tot-ops"] += 1
