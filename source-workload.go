@@ -277,7 +277,7 @@ func init() {
 		cur_left := cur["tot-"+var_left]
 		cur_right := cur["tot-"+var_right]
 		cur_total := cur_left + cur_right
-		ratio_left := cfg.cfg["ratio-"+var_left].(float64)
+		ratio_left := cfg.cfg["choose-"+var_left].(float64)
 		if float64(cur_left)/float64(cur_total) < ratio_left {
 			cur["tot-"+var_left] += uint64(1)
 			WorkLoadNextCmd(cfg, clientNum, block_left, 0, cur, out)
