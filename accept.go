@@ -64,7 +64,7 @@ func MakeListenSourceFunc(source Source) func(string, Params, Target, chan Stats
 // goroutine for each accepted net.Conn.
 func AcceptConns(ls net.Listener, maxConns int,
 	source Source, target Target, statsChan chan Stats) {
-	log.Printf("accepting max conns: %d", maxConns)
+	log.Printf("AcceptConns: accepting max conns: %d", maxConns)
 
 	chanAccepted := make(chan io.ReadWriteCloser)
 	chanClosed := make(chan io.ReadWriteCloser)
@@ -85,15 +85,15 @@ func AcceptConns(ls net.Listener, maxConns int,
 
 	for {
 		if numConns < maxConns {
-			log.Printf("accepted conns: %d", numConns)
+			log.Printf("AcceptConns: accepted conns: %d", numConns)
 			select {
 			case c := <-chanAccepted:
 				if c == nil {
-					log.Printf("error: can't accept more conns")
+					log.Printf("AcceptConns: error: can't accept more conns")
 					return
 				}
 
-				log.Printf("conn accepted")
+				log.Printf("AcceptConns: conn accepted")
 				numConns++
 				totConns++
 
@@ -103,13 +103,13 @@ func AcceptConns(ls net.Listener, maxConns int,
 					s.Close()
 				}(c)
 			case <-chanClosed:
-				log.Printf("conn closed")
+				log.Printf("AcceptConns: conn closed")
 				numConns--
 			}
 		} else {
-			log.Printf("reached max conns: %d", numConns)
+			log.Printf("AcceptConns: reached max conns: %d", numConns)
 			<-chanClosed
-			log.Printf("conn closed")
+			log.Printf("AcceptConns: conn closed")
 			numConns--
 		}
 	}
