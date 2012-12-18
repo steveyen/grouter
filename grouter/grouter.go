@@ -11,6 +11,7 @@ import (
 
 type EndPoint struct {
 	Usage string // Help string.
+	Descrip string
 	RunSource func(string, grouter.Params, grouter.Target, chan grouter.Stats)
 	StartTarget func(string, grouter.Params, chan grouter.Stats) grouter.Target
 	MaxConcurrency int // Some end-points have limited concurrency.
@@ -20,14 +21,17 @@ type EndPoint struct {
 var Sources = map[string]EndPoint{
 	"memcached": EndPoint{
 		Usage: "memcached:LISTEN_INTERFACE:LISTEN_PORT",
+		Descrip: "memcached ascii source",
 		RunSource: grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
 	},
 	"memcached-ascii": EndPoint{
 		Usage: "memcached-ascii:LISTEN_INTERFACE:LISTEN_PORT",
+		Descrip: "memcached ascii source",
 		RunSource: grouter.MakeListenSourceFunc(&grouter.AsciiSource{}),
 	},
 	"workload": EndPoint{
 		Usage: "workload",
+		Descrip: "a simple workload generator",
 		RunSource: grouter.WorkLoadRun,
 	},
 }
@@ -36,22 +40,27 @@ var Sources = map[string]EndPoint{
 var Targets = map[string]EndPoint{
 	"http": EndPoint{
 		Usage: "http://COUCHBASE_HOST:COUCHBASE_PORT",
+		Descrip: "couchbase server as a target",
         StartTarget: grouter.CouchbaseTargetStart,
 	},
 	"couchbase": EndPoint{
 		Usage: "couchbase://COUCHBASE_HOST:COUCHBASE_PORT",
+		Descrip: "couchbase server as a target",
         StartTarget: grouter.CouchbaseTargetStart,
 	},
 	"memcached-ascii": EndPoint{
 		Usage: "memcached-ascii:HOST:PORT",
+		Descrip: "memcached (ascii protocol) server as a target",
 		StartTarget: grouter.MemcachedAsciiTargetStart,
 	},
 	"memcached-binary": EndPoint{
 		Usage: "memcached-binary:HOST:PORT",
+		Descrip: "memcached (binary protocol) server as a target",
 		StartTarget: grouter.MemcachedBinaryTargetStart,
 	},
 	"memory": EndPoint{
 		Usage: "memory",
+		Descrip: "simple in-memory hashtable target",
 		StartTarget: grouter.MemoryStorageStart,
 		MaxConcurrency: 1,
 	},
@@ -63,7 +72,7 @@ func main() {
         "    as SOURCE_KIND[:MORE_PARAMS]\n" +
         "    examples..." + EndPointExamples(Sources))
 	sourceMaxConns := flag.Int("source-max-conns", 100,
-		"max conns allowed from source")
+		"max conns allowed into source")
 
 	targetSpec := flag.String("target", "memory",
         "target of requests\n" +
@@ -132,6 +141,7 @@ func EndPointExamples(m map[string]EndPoint) (rv string) {
 	rv = ""
 	for _, s := range mk {
 		rv = rv + "\n      " + m[s].Usage
+		rv = rv + "\n        -- " + m[s].Descrip
 	}
 	return rv
 }
