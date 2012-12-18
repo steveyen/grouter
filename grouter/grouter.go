@@ -72,7 +72,7 @@ func main() {
         "    as SOURCE_KIND[:MORE_PARAMS]\n" +
         "    examples..." + endPointExamples(sources))
 	sourceMaxConns := flag.Int("source-max-conns", 100,
-		"max conns allowed into source")
+		"max conns allowed via source")
 
 	targetSpec := flag.String("target", "memory",
         "target of requests\n" +
