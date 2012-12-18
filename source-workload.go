@@ -342,7 +342,7 @@ func init() {
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
 			extras := make([]byte, 8)
-			binary.BigEndian.PutUint32(extras, uint32(0)) // flg.
+			binary.BigEndian.PutUint32(extras, uint32(0))     // flg.
 			binary.BigEndian.PutUint32(extras[4:], uint32(0)) // exp.
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.SET,
