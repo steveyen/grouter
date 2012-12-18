@@ -25,12 +25,12 @@ Or, old-school...
 For developers, to (re-)build it...
 
     cd grouter
-    go build ./main/grouter.go
+    (cd grouter && go build)
 
 Running
 -------
 
-    ./grouter --help
+    ./grouter/grouter --help
 
 License
 -------
