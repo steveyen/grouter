@@ -50,7 +50,7 @@ func StartStatsReporter(chanSize int) chan Stats {
 func StatsReport(curr map[string]int64, prev map[string]int64,
 	reportSecs time.Duration, full bool) bool {
 	// Reports rates on paired stats that follow a naming convention
-	// like xxx and xxx_usecs.  For example, tot-ops and tot-ops-usecs.
+	// like xxx and xxx-usecs.  For example, tot-ops and tot-ops-usecs.
 	emitted := false
 
 	i := 0
