@@ -32,6 +32,13 @@ Running
 
     ./grouter/grouter --help
 
+Workload generation...
+
+    ./grouter/grouter \
+        --source=workload:concurrency=200 \
+        --target=couchbase://10.3.121.192:8091 \
+        --target-concurrency=200
+
 License
 -------
 
