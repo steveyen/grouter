@@ -28,7 +28,7 @@ func CouchbaseTargetKeyHandler(req Request, bucket *couchbase.Bucket) {
 		res, err = mc.Send(req.Req)
 		return err
 	})
-	if err != nil || res == nil {
+	if res == nil {
 		res = &gomemcached.MCResponse{
 			Status: gomemcached.KEY_ENOENT,
 			Opcode: req.Req.Opcode,
