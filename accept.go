@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sort"
 	"strings"
 	"time"
 
@@ -171,4 +172,35 @@ func BatchRequests(maxBatchSize int, incoming chan []Request, outgoing chan []Re
 			tot_batch = int64(0)
 		}
 	}
+}
+
+type Requests struct {
+	reqs   []Request
+	sortBy func(bucket string, key []byte) int
+}
+
+func (r *Requests) Len() int {
+	return len(r.reqs)
+}
+
+func (r *Requests) Less(i, j int) bool {
+	if r.reqs[i].Bucket < r.reqs[j].Bucket {
+		return true
+	}
+	if r.reqs[i].Bucket == r.reqs[j].Bucket &&
+		r.sortBy(r.reqs[i].Bucket, r.reqs[i].Req.Key) <
+		r.sortBy(r.reqs[j].Bucket, r.reqs[j].Req.Key) {
+		return true
+	}
+	return false
+}
+
+func (r *Requests) Swap(i, j int) {
+	r.reqs[i], r.reqs[j] = r.reqs[j], r.reqs[i]
+}
+
+// Sorts requests by bucket, and then by caller-supplied func results.
+// The func usually does a vbucketId hash on the key.
+func SortRequests(reqs []Request, sortBy func(string, []byte) int) {
+	sort.Sort(&Requests{reqs: reqs, sortBy: sortBy})
 }

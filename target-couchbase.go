@@ -73,29 +73,26 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 		log.Fatalf("error: no default pool; err: %v", err)
 	}
 
-	go func() {
-		var err error
-		var lastBucketName string
-		var lastBucket, bucket *couchbase.Bucket
+	// TODO: Need to handle bucket disappearing/reappearing/rebalancing.
+	buckets := make(map[string] *couchbase.Bucket)
 
-		for reqs := range incoming {
-			for _, req := range reqs {
-				if req.Bucket == lastBucketName {
-					bucket = lastBucket
-				} else {
-					bucket, err = pool.GetBucket(req.Bucket)
-				}
-				if err != nil {
-					log.Printf("warn: missing bucket: %s; err: %v", req.Bucket, err)
-					req.Res <- &gomemcached.MCResponse{
-						Opcode: req.Req.Opcode,
-						Status: gomemcached.EINVAL,
-						Opaque: req.Req.Opaque,
-					}
-				} else {
-					lastBucketName = req.Bucket
-					lastBucket = bucket
+	getBucket := func(bucketName string) (res *couchbase.Bucket) {
+		if res = buckets[bucketName]; res == nil {
+			if res, _ = pool.GetBucket(bucketName); res != nil {
+				buckets[bucketName] = res
+			}
+		}
+		return res
+	}
 
+	worker := func(serverCh chan []Request) {
+		// All the requests have same bucket and server.
+		for reqs := range serverCh {
+			if len(reqs) < 1 {
+				continue
+			}
+			if bucket := getBucket(reqs[0].Bucket); bucket != nil {
+				for _, req := range reqs {
 					if h, ok := CouchbaseTargetHandlers[req.Req.Opcode]; ok {
 						h(req, bucket)
 					} else {
@@ -107,6 +104,54 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 					}
 				}
 			}
+		}
+	}
+
+	serverChs := make(map[int] chan []Request)
+
+	sendBatchToServer := func(serverIndex int, reqs []Request) {
+		// All the requests have same bucket and server index.
+		serverCh := serverChs[serverIndex]
+		if serverCh == nil {
+			serverCh = make(chan []Request, 1)
+			serverChs[serverIndex] = serverCh
+			go worker(serverCh)
+		} else {
+			serverCh <- reqs
+		}
+	}
+
+	go func() {
+		getServerIndex := func(bucketName string, key []byte) int {
+			b := getBucket(bucketName)
+			if b != nil {
+				vbid := b.VBHash(string(key))
+				return b.VBucketServerMap.VBucketMap[vbid][0]
+			}
+			return -1
+		}
+
+		for reqs := range incoming {
+			SortRequests(reqs, getServerIndex) // Sort requests by server index.
+
+			startSvr := -1
+			startReq := -1
+
+			for i, currReq := range reqs {
+				currSvr := getServerIndex(currReq.Bucket, currReq.Req.Key)
+
+				if startReq >= 0 {
+					if reqs[startReq].Bucket == currReq.Bucket &&
+						startSvr == currSvr {
+						continue
+					}
+					sendBatchToServer(startSvr, reqs[startReq : i])
+				}
+
+				startSvr = currSvr
+				startReq = i
+			}
+			sendBatchToServer(startSvr, reqs[startReq : len(reqs)])
 		}
 	}()
 }
