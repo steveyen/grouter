@@ -91,17 +91,28 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 			if len(reqs) < 1 {
 				continue
 			}
+
 			if bucket := getBucket(reqs[0].Bucket); bucket != nil {
 				for _, req := range reqs {
-					if h, ok := CouchbaseTargetHandlers[req.Req.Opcode]; ok {
-						h(req, bucket)
-					} else {
-						req.Res <- &gomemcached.MCResponse{
-							Opcode: req.Req.Opcode,
-							Status: gomemcached.UNKNOWN_COMMAND,
-							Opaque: req.Req.Opaque,
+					bucket.Do(string(req.Req.Key), func(c *memcached.Client, v uint16) error {
+						req.Req.VBucket = v
+						return c.Transmit(req.Req)
+					})
+				}
+
+				for _, req := range reqs {
+					bucket.Do(string(req.Req.Key), func(c *memcached.Client, v uint16) error {
+						res, err := c.Receive()
+						if err != nil || res == nil {
+							res = &gomemcached.MCResponse{
+								Opcode: req.Req.Opcode,
+								Status: gomemcached.EINVAL,
+								Opaque: req.Req.Opaque,
+							}
 						}
-					}
+						req.Res <- res
+						return err
+					})
 				}
 			}
 		}
