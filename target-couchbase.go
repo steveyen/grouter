@@ -6,6 +6,7 @@ import (
 
 	"github.com/couchbaselabs/go-couchbase"
 	"github.com/dustin/gomemcached"
+	"github.com/dustin/gomemcached/client"
 )
 
 type CouchbaseTarget struct {
@@ -19,16 +20,29 @@ func (s CouchbaseTarget) PickChannel(clientNum uint32, bucket string) chan []Req
 
 type CouchbaseTargetHandler func(req Request, bucket *couchbase.Bucket)
 
-var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler{
-	gomemcached.GET: func(req Request, bucket *couchbase.Bucket) {
-		ret := &gomemcached.MCResponse{
+func CouchbaseTargetKeyHandler(req Request, bucket *couchbase.Bucket) {
+	var err error
+	var res *gomemcached.MCResponse
+	err = bucket.Do(string(req.Req.Key), func(mc *memcached.Client, vb uint16) error {
+		req.Req.VBucket = vb
+		res, err = mc.Send(req.Req)
+		return err
+	})
+	if err != nil || res == nil {
+		res = &gomemcached.MCResponse{
+			Status: gomemcached.KEY_ENOENT,
 			Opcode: req.Req.Opcode,
 			Opaque: req.Req.Opaque,
 			Key:    req.Req.Key,
 		}
-		ret.Status = gomemcached.KEY_ENOENT
-		req.Res <- ret
-	},
+	}
+	req.Res <- res
+}
+
+var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler{
+	gomemcached.GET:    CouchbaseTargetKeyHandler,
+	gomemcached.SET:    CouchbaseTargetKeyHandler,
+	gomemcached.DELETE: CouchbaseTargetKeyHandler,
 }
 
 func CouchbaseTargetStart(spec string, params Params,
@@ -60,9 +74,17 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 	}
 
 	go func() {
+		var err error
+		var lastBucketName string
+		var lastBucket, bucket *couchbase.Bucket
+
 		for reqs := range incoming {
 			for _, req := range reqs {
-				bucket, err := pool.GetBucket(req.Bucket)
+				if req.Bucket == lastBucketName {
+					bucket = lastBucket
+				} else {
+					bucket, err = pool.GetBucket(req.Bucket)
+				}
 				if err != nil {
 					log.Printf("warn: missing bucket: %s; err: %v", req.Bucket, err)
 					req.Res <- &gomemcached.MCResponse{
@@ -71,6 +93,9 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 						Opaque: req.Req.Opaque,
 					}
 				} else {
+					lastBucketName = req.Bucket
+					lastBucket = bucket
+
 					if h, ok := CouchbaseTargetHandlers[req.Req.Opcode]; ok {
 						h(req, bucket)
 					} else {
