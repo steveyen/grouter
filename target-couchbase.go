@@ -18,33 +18,6 @@ func (s CouchbaseTarget) PickChannel(clientNum uint32, bucket string) chan []Req
 	return s.incomingChans[clientNum%uint32(len(s.incomingChans))]
 }
 
-type CouchbaseTargetHandler func(req Request, bucket *couchbase.Bucket)
-
-func CouchbaseTargetKeyHandler(req Request, bucket *couchbase.Bucket) {
-	var err error
-	var res *gomemcached.MCResponse
-	err = bucket.Do(string(req.Req.Key), func(mc *memcached.Client, vb uint16) error {
-		req.Req.VBucket = vb
-		res, err = mc.Send(req.Req)
-		return err
-	})
-	if res == nil {
-		res = &gomemcached.MCResponse{
-			Status: gomemcached.KEY_ENOENT,
-			Opcode: req.Req.Opcode,
-			Opaque: req.Req.Opaque,
-			Key:    req.Req.Key,
-		}
-	}
-	req.Res <- res
-}
-
-var CouchbaseTargetHandlers = map[gomemcached.CommandCode]CouchbaseTargetHandler{
-	gomemcached.GET:    CouchbaseTargetKeyHandler,
-	gomemcached.SET:    CouchbaseTargetKeyHandler,
-	gomemcached.DELETE: CouchbaseTargetKeyHandler,
-}
-
 func CouchbaseTargetStart(spec string, params Params,
 	statsChan chan Stats) Target {
 	spec = strings.Replace(spec, "couchbase:", "http:", 1)
