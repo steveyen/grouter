@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -26,10 +27,13 @@ type WorkLoadCfg struct {
 }
 
 const (
-	DEFAULT_MAX_ITEM   = int64(10000)
-	DEFAULT_MAX_CREATE = int64(10000)
-	DEFAULT_RATIO_HOT  = float64(1.0)
-	LARGE_PRIME        = uint64(9576890767)
+	DEFAULT_JSON         = 1
+	DEFAULT_MAX_CREATE   = int64(10000)
+	DEFAULT_MAX_ITEM     = int64(10000)
+	DEFAULT_MIN_VAL_SIZE = 100
+	DEFAULT_RATIO_HOT    = float64(1.0)
+
+	LARGE_PRIME = uint64(9576890767)
 )
 
 // The source entry function for synthetic workload generation.
@@ -344,11 +348,14 @@ func init() {
 			extras := make([]byte, 8)
 			binary.BigEndian.PutUint32(extras, uint32(0))     // flg.
 			binary.BigEndian.PutUint32(extras[4:], uint32(0)) // exp.
+			key := WorkLoadKeyString(cfg, cur["key"])
+			mks := WorkLoadCfgGetInt(cfg, "min-val-size", DEFAULT_MIN_VAL_SIZE)
+			json := WorkLoadCfgGetInt(cfg, "json", DEFAULT_JSON) != 0
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.SET,
-				Key:    []byte(WorkLoadKeyString(cfg, cur["key"])),
+				Key:    []byte(key),
 				Extras: extras,
-				Body:   []byte(WorkLoadKeyString(cfg, cur["key"])),
+				Body:   []byte(genValString(cur["key"], key, mks, json)),
 			}
 			cur["tot-ops-set"] += 1
 			cur["tot-ops"] += 1
@@ -419,4 +426,71 @@ func ReadJSONFile(path string) interface{} {
 		log.Fatalf("error: could not parse json from: %v; err: %v", path, err)
 	}
 	return data
+}
+
+// A key is a 16 char hex string.
+
+func keyToName(keyNum uint64, keyStr string) string {
+	n := len(keyStr)
+	return keyStr[n-16:n-12] + " " + keyStr[n-4:n-1]
+}
+
+func keyToEmail(keyNum uint64, keyStr string) string {
+	n := len(keyStr)
+	return fmt.Sprintf("%v@%v.com", keyStr[n-16:n-12], keyStr[n-13:n-11])
+}
+
+func keyToCity(keyNum uint64, keyStr string) string {
+	n := len(keyStr)
+	return keyStr[n-12 : n-9]
+}
+
+func keyToCountry(keyNum uint64, keyStr string) string {
+	n := len(keyStr)
+	return keyStr[n-9 : n-7]
+}
+
+func keyToRealm(keyNum uint64, keyStr string) string {
+	n := len(keyStr)
+	return keyStr[n-7 : n-5]
+}
+
+func keyToCoins(keyNum uint64, keyStr string) string {
+	n := len(keyStr)
+	subKey := keyStr[n-16:]
+	i, _ := strconv.ParseInt(subKey[0:4], 16, 64)
+	return fmt.Sprintf("%v", math.Max(0.0, float64(i)/100.0))
+}
+
+func keyToCategory(keyNum uint64, keyStr string) string {
+	n := len(keyStr)
+	i, _ := strconv.ParseInt(keyStr[n-12:n-11], 16, 64)
+	return strconv.Itoa(int(i) % 3)
+}
+
+func genValString(keyNum uint64, keyStr string, minValueSize int, json bool) string {
+	c := '{'
+	if !json {
+		c = '*'
+	}
+	d := fmt.Sprintf(`%c"key":"%v",
+ "key_num":%v,
+ "name":"%v",
+ "email":"%v",
+ "city":"%v",
+ "country":"%v",
+ "realm":"%v",
+ "coins":%v,
+ "category":%v}`,
+		c,
+		keyStr,
+		keyNum,
+		keyToName(keyNum, keyStr),
+		keyToEmail(keyNum, keyStr),
+		keyToCity(keyNum, keyStr),
+		keyToCountry(keyNum, keyStr),
+		keyToRealm(keyNum, keyStr),
+		keyToCoins(keyNum, keyStr),
+		keyToCategory(keyNum, keyStr))
+	return d
 }
