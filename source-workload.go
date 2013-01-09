@@ -349,13 +349,13 @@ func init() {
 			binary.BigEndian.PutUint32(extras, uint32(0))     // flg.
 			binary.BigEndian.PutUint32(extras[4:], uint32(0)) // exp.
 			key := WorkLoadKeyString(cfg, cur["key"])
-			mks := WorkLoadCfgGetInt(cfg, "min-val-size", DEFAULT_MIN_VAL_SIZE)
+			mvs := WorkLoadCfgGetInt(cfg, "min-val-size", DEFAULT_MIN_VAL_SIZE)
 			json := WorkLoadCfgGetInt(cfg, "json", DEFAULT_JSON) != 0
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.SET,
 				Key:    []byte(key),
 				Extras: extras,
-				Body:   []byte(genValString(cur["key"], key, mks, json)),
+				Body:   []byte(genValString(cur["key"], key, mvs, json)),
 			}
 			cur["tot-ops-set"] += 1
 			cur["tot-ops"] += 1
