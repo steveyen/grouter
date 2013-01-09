@@ -189,7 +189,7 @@ func (r *Requests) Less(i, j int) bool {
 	}
 	if r.reqs[i].Bucket == r.reqs[j].Bucket &&
 		r.sortBy(r.reqs[i].Bucket, r.reqs[i].Req.Key) <
-		r.sortBy(r.reqs[j].Bucket, r.reqs[j].Req.Key) {
+			r.sortBy(r.reqs[j].Bucket, r.reqs[j].Req.Key) {
 		return true
 	}
 	return false
