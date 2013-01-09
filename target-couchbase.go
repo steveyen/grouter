@@ -47,7 +47,7 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 	}
 
 	// TODO: Need to handle bucket disappearing/reappearing/rebalancing.
-	buckets := make(map[string] *couchbase.Bucket)
+	buckets := make(map[string]*couchbase.Bucket)
 
 	getBucket := func(bucketName string) (res *couchbase.Bucket) {
 		if res = buckets[bucketName]; res == nil {
@@ -58,50 +58,45 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 		return res
 	}
 
-	worker := func(serverCh chan []Request) {
-		// All the requests have same bucket and server.
-		for reqs := range serverCh {
-			if len(reqs) < 1 {
-				continue
-			}
+	processRequests := func(reqs []Request) {
+		// All the requests have same bucket and server index.
+		if len(reqs) < 1 {
+			return
+		}
 
-			if bucket := getBucket(reqs[0].Bucket); bucket != nil {
-				for _, req := range reqs {
-					bucket.Do(string(req.Req.Key), func(c *memcached.Client, v uint16) error {
+		if bucket := getBucket(reqs[0].Bucket); bucket != nil {
+			for _, req := range reqs {
+				bucket.Do(string(req.Req.Key),
+					func(c *memcached.Client, v uint16) error {
 						req.Req.VBucket = v
 						return c.Transmit(req.Req)
 					})
-				}
+			}
 
-				for _, req := range reqs {
-					bucket.Do(string(req.Req.Key), func(c *memcached.Client, v uint16) error {
-						res, err := c.Receive()
-						if err != nil || res == nil {
-							res = &gomemcached.MCResponse{
-								Opcode: req.Req.Opcode,
-								Status: gomemcached.EINVAL,
-								Opaque: req.Req.Opaque,
-							}
-						}
-						req.Res <- res
+			for _, req := range reqs {
+				var res *gomemcached.MCResponse
+				err := bucket.Do(string(req.Req.Key),
+					func(c *memcached.Client, v uint16) error {
+						res, err = c.Receive()
 						return err
 					})
+				if err != nil || res == nil {
+					res = &gomemcached.MCResponse{
+						Opcode: req.Req.Opcode,
+						Status: gomemcached.EINVAL,
+						Opaque: req.Req.Opaque,
+					}
+				}
+				req.Res <- res
+			}
+		} else {
+			for _, req := range reqs {
+				req.Res <- &gomemcached.MCResponse{
+					Opcode: req.Req.Opcode,
+					Status: gomemcached.EINVAL,
+					Opaque: req.Req.Opaque,
 				}
 			}
-		}
-	}
-
-	serverChs := make(map[int] chan []Request)
-
-	sendBatchToServer := func(serverIndex int, reqs []Request) {
-		// All the requests have same bucket and server index.
-		serverCh := serverChs[serverIndex]
-		if serverCh == nil {
-			serverCh = make(chan []Request, 10)
-			serverChs[serverIndex] = serverCh
-			go worker(serverCh)
-		} else {
-			serverCh <- reqs
 		}
 	}
 
@@ -129,13 +124,13 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 						startSvr == currSvr {
 						continue
 					}
-					sendBatchToServer(startSvr, reqs[startReq : i])
+					processRequests(reqs[startReq:i])
 				}
 
 				startSvr = currSvr
 				startReq = i
 			}
-			sendBatchToServer(startSvr, reqs[startReq : len(reqs)])
+			processRequests(reqs[startReq:len(reqs)])
 		}
 	}()
 }
