@@ -97,7 +97,7 @@ func CouchbaseTargetStartIncoming(s CouchbaseTarget, incoming chan []Request) {
 		// All the requests have same bucket and server index.
 		serverCh := serverChs[serverIndex]
 		if serverCh == nil {
-			serverCh = make(chan []Request, 1)
+			serverCh = make(chan []Request, 10)
 			serverChs[serverIndex] = serverCh
 			go worker(serverCh)
 		} else {
