@@ -18,6 +18,8 @@
 
     "batch": 1000,
     "batch-": "Batch/pipeline up this # of commands per connection",
+    "body-size": 100,
+    "body-size-": "Size of document's body field, in bytes",
     "concurrency": 1,
     "concurrency-": "Number of concurrent workload generators",
     "cmd-tree": "workload-cmd-tree.json",
@@ -28,8 +30,6 @@
     "max-create-": "Maxiumum number of items to create; defaults to max-items",
     "max-item": 10000,
     "max-item-": "Maximum number of items",
-    "min-val-size": 100,
-    "min-val-size-": "Mininum value size, in bytes",
     "prefix": "",
     "prefix-": "prefix for generated keys; hyphen ('-') separator auto-added",
     "hashed": 1,

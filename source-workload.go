@@ -27,11 +27,11 @@ type WorkLoadCfg struct {
 }
 
 const (
-	DEFAULT_JSON         = 1
-	DEFAULT_MAX_CREATE   = int64(10000)
-	DEFAULT_MAX_ITEM     = int64(10000)
-	DEFAULT_MIN_VAL_SIZE = 100
-	DEFAULT_RATIO_HOT    = float64(1.0)
+	DEFAULT_JSON       = 1
+	DEFAULT_MAX_CREATE = int64(10000)
+	DEFAULT_MAX_ITEM   = int64(10000)
+	DEFAULT_BODY_SIZE  = 100
+	DEFAULT_RATIO_HOT  = float64(1.0)
 
 	LARGE_PRIME = uint64(9576890767)
 )
@@ -40,6 +40,14 @@ const (
 func WorkLoadRun(sourceSpec string, params Params, target Target,
 	statsChan chan Stats) {
 	cfg := WorkLoadCfgLog(WorkLoadCfgRead(sourceSpec, "./workload.json"))
+
+	bodySize := WorkLoadCfgGetInt(cfg, "body-size", DEFAULT_BODY_SIZE)
+	body := "x"
+	for len(body) < bodySize {
+		body = body + MD5(body)
+	}
+	cfg.cfg["body"] = body[0:bodySize]
+
 	num := WorkLoadCfgGetFloat64(cfg, "concurrency", float64(params.TargetConcurrency))
 	for i := 1; i < int(num); i++ {
 		go WorkLoad(cfg, uint32(i), sourceSpec, target, statsChan)
@@ -349,13 +357,13 @@ func init() {
 			binary.BigEndian.PutUint32(extras, uint32(0))     // flg.
 			binary.BigEndian.PutUint32(extras[4:], uint32(0)) // exp.
 			key := WorkLoadKeyString(cfg, cur["key"])
-			mvs := WorkLoadCfgGetInt(cfg, "min-val-size", DEFAULT_MIN_VAL_SIZE)
 			json := WorkLoadCfgGetInt(cfg, "json", DEFAULT_JSON) != 0
+			body := WorkLoadCfgGetString(cfg, "body", "")
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.SET,
 				Key:    []byte(key),
 				Extras: extras,
-				Body:   []byte(genValString(cur["key"], key, mvs, json)),
+				Body:   []byte(genValString(cur["key"], key, json, body)),
 			}
 			cur["tot-ops-set"] += 1
 			cur["tot-ops"] += 1
@@ -468,7 +476,7 @@ func keyToCategory(keyNum uint64, keyStr string) string {
 	return strconv.Itoa(int(i) % 3)
 }
 
-func genValString(keyNum uint64, keyStr string, minValueSize int, json bool) string {
+func genValString(keyNum uint64, keyStr string, json bool, body string) string {
 	c := '{'
 	if !json {
 		c = '*'
@@ -481,7 +489,8 @@ func genValString(keyNum uint64, keyStr string, minValueSize int, json bool) str
  "country":"%v",
  "realm":"%v",
  "coins":%v,
- "category":%v}`,
+ "category":%v,
+ "body":"%v"}`,
 		c,
 		keyStr,
 		keyNum,
@@ -491,6 +500,7 @@ func genValString(keyNum uint64, keyStr string, minValueSize int, json bool) str
 		keyToCountry(keyNum, keyStr),
 		keyToRealm(keyNum, keyStr),
 		keyToCoins(keyNum, keyStr),
-		keyToCategory(keyNum, keyStr))
+		keyToCategory(keyNum, keyStr),
+		body)
 	return d
 }
