@@ -356,14 +356,14 @@ func init() {
 			extras := make([]byte, 8)
 			binary.BigEndian.PutUint32(extras, uint32(0))     // flg.
 			binary.BigEndian.PutUint32(extras[4:], uint32(0)) // exp.
-			key := WorkLoadKeyString(cfg, cur["key"])
+			key, keyHash := WorkLoadKeyString(cfg, cur["key"])
 			json := WorkLoadCfgGetInt(cfg, "json", DEFAULT_JSON) != 0
 			body := WorkLoadCfgGetString(cfg, "body", "")
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.SET,
 				Key:    []byte(key),
 				Extras: extras,
-				Body:   []byte(genValString(cur["key"], key, json, body)),
+				Body:   []byte(genValString(cur["key"], key, keyHash, json, body)),
 			}
 			cur["tot-ops-set"] += 1
 			cur["tot-ops"] += 1
@@ -376,9 +376,10 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
+			key, _ := WorkLoadKeyString(cfg, cur["key"])
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.GET,
-				Key:    []byte(WorkLoadKeyString(cfg, cur["key"])),
+				Key:    []byte(key),
 			}
 			cur["tot-ops-get"] += 1
 			cur["tot-ops"] += 1
@@ -391,9 +392,10 @@ func init() {
 		cmd_tree []interface{}, pos int,
 		cur map[string]uint64, out []gomemcached.MCRequest) int {
 		if cur["out"] < uint64(len(out)) {
+			key, _ := WorkLoadKeyString(cfg, cur["key"])
 			out[cur["out"]] = gomemcached.MCRequest{
 				Opcode: gomemcached.DELETE,
-				Key:    []byte(WorkLoadKeyString(cfg, cur["key"])),
+				Key:    []byte(key),
 			}
 			cur["tot-ops-delete"] += 1
 			cur["tot-ops"] += 1
@@ -403,17 +405,17 @@ func init() {
 	}
 }
 
-func WorkLoadKeyString(cfg WorkLoadCfg, key uint64) string {
-	s := strconv.FormatUint(key, 10)
-	hashed := WorkLoadCfgGetInt(cfg, "hashed", 1) > 0
-	if hashed {
-		s = MD5(s)[0:16]
+func WorkLoadKeyString(cfg WorkLoadCfg, keyNum uint64) (string, string) {
+	keyStr := strconv.FormatUint(keyNum, 10)
+	keyHash := MD5(keyStr)[0:16]
+	if WorkLoadCfgGetInt(cfg, "hashed", 1) > 0 {
+		keyStr = keyHash
 	}
 	prefix := WorkLoadCfgGetString(cfg, "prefix", "")
 	if len(prefix) > 0 {
-		s = prefix + "-" + s
+		keyStr = prefix + "-" + keyStr
 	}
-	return s
+	return keyStr, keyHash
 }
 
 func MD5(s string) string {
@@ -436,47 +438,48 @@ func ReadJSONFile(path string) interface{} {
 	return data
 }
 
-// A key is a 16 char hex string.
+// A keyHash is a 16 char hex string.
 
-func keyToName(keyNum uint64, keyStr string) string {
-	n := len(keyStr)
-	return keyStr[n-16:n-12] + " " + keyStr[n-4:n-1]
+func keyToName(keyNum uint64, keyHash string) string {
+	n := len(keyHash)
+	return keyHash[n-16:n-12] + " " + keyHash[n-4:n-1]
 }
 
-func keyToEmail(keyNum uint64, keyStr string) string {
-	n := len(keyStr)
-	return fmt.Sprintf("%v@%v.com", keyStr[n-16:n-12], keyStr[n-13:n-11])
+func keyToEmail(keyNum uint64, keyHash string) string {
+	n := len(keyHash)
+	return fmt.Sprintf("%v@%v.com", keyHash[n-16:n-12], keyHash[n-13:n-11])
 }
 
-func keyToCity(keyNum uint64, keyStr string) string {
-	n := len(keyStr)
-	return keyStr[n-12 : n-9]
+func keyToCity(keyNum uint64, keyHash string) string {
+	n := len(keyHash)
+	return keyHash[n-12 : n-9]
 }
 
-func keyToCountry(keyNum uint64, keyStr string) string {
-	n := len(keyStr)
-	return keyStr[n-9 : n-7]
+func keyToCountry(keyNum uint64, keyHash string) string {
+	n := len(keyHash)
+	return keyHash[n-9 : n-7]
 }
 
-func keyToRealm(keyNum uint64, keyStr string) string {
-	n := len(keyStr)
-	return keyStr[n-7 : n-5]
+func keyToRealm(keyNum uint64, keyHash string) string {
+	n := len(keyHash)
+	return keyHash[n-7 : n-5]
 }
 
-func keyToCoins(keyNum uint64, keyStr string) string {
-	n := len(keyStr)
-	subKey := keyStr[n-16:]
+func keyToCoins(keyNum uint64, keyHash string) string {
+	n := len(keyHash)
+	subKey := keyHash[n-16:]
 	i, _ := strconv.ParseInt(subKey[0:4], 16, 64)
 	return fmt.Sprintf("%v", math.Max(0.0, float64(i)/100.0))
 }
 
-func keyToCategory(keyNum uint64, keyStr string) string {
-	n := len(keyStr)
-	i, _ := strconv.ParseInt(keyStr[n-12:n-11], 16, 64)
+func keyToCategory(keyNum uint64, keyHash string) string {
+	n := len(keyHash)
+	i, _ := strconv.ParseInt(keyHash[n-12:n-11], 16, 64)
 	return strconv.Itoa(int(i) % 3)
 }
 
-func genValString(keyNum uint64, keyStr string, json bool, body string) string {
+func genValString(keyNum uint64, keyStr string, keyHash string,
+	json bool, body string) string {
 	c := '{'
 	if !json {
 		c = '*'
@@ -494,13 +497,13 @@ func genValString(keyNum uint64, keyStr string, json bool, body string) string {
 		c,
 		keyStr,
 		keyNum,
-		keyToName(keyNum, keyStr),
-		keyToEmail(keyNum, keyStr),
-		keyToCity(keyNum, keyStr),
-		keyToCountry(keyNum, keyStr),
-		keyToRealm(keyNum, keyStr),
-		keyToCoins(keyNum, keyStr),
-		keyToCategory(keyNum, keyStr),
+		keyToName(keyNum, keyHash),
+		keyToEmail(keyNum, keyHash),
+		keyToCity(keyNum, keyHash),
+		keyToCountry(keyNum, keyHash),
+		keyToRealm(keyNum, keyHash),
+		keyToCoins(keyNum, keyHash),
+		keyToCategory(keyNum, keyHash),
 		body)
 	return d
 }

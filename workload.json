@@ -24,6 +24,8 @@
     "concurrency-": "Number of concurrent workload generators",
     "cmd-tree": "workload-cmd-tree.json",
     "cmd-tree-": "Command decision tree to follow when generating requests",
+    "hashed": 1,
+    "hashed-": "When 1, generated keys are hashed instead of linear integers",
     "json": 1,
     "json-": "When 1, generates json values",
     "max-create": 10000,
@@ -32,8 +34,6 @@
     "max-item-": "Maximum number of items",
     "prefix": "",
     "prefix-": "prefix for generated keys; hyphen ('-') separator auto-added",
-    "hashed": 1,
-    "hashed-": "When 1, generated keys are hashed instead of linear integers",
     "ratio-hot": 0.2,
     "ratio-hot-": "Fraction of items to have as a hot item subset"
 }
